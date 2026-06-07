@@ -17,7 +17,7 @@ import fitz
 
 SRC = "samples/se_lc_champs.pdf"
 STROKE = {"Free": "FR", "Back": "BK", "Breast": "BR", "Fly": "FL", "IM": "IM"}
-AGE_RE = re.compile(r"(8&UNDER|10&UNDER|11&12|13&14|15&16|17&18)", re.I)
+AGE_RE = re.compile(r"(8&UNDER|10&UNDER|11&12|13&14|15&16|17&18|OPEN|SENIOR)", re.I)
 EVENT_RE = re.compile(r"^(\d+)\s+(Free|Back|Breast|Fly|IM)$")
 NUM_RE = re.compile(r"^[\d:]+\.\d{2}$")
 
@@ -25,7 +25,14 @@ NUM_RE = re.compile(r"^[\d:]+\.\d{2}$")
 def norm_age(s):
     s = s.upper().replace(" ", "")
     return {"8&UNDER": "10U", "10&UNDER": "10U", "11&12": "11-12",
-            "13&14": "13-14", "15&16": "15-16", "17&18": "17-18"}.get(s, s)
+            "13&14": "13-14", "15&16": "15-16", "17&18": "17-18",
+            "OPEN": "OPEN", "SENIOR": "OPEN"}.get(s, s)
+
+
+# SE's older group is "Open" (13 & over); apply its cuts to the 15-16 and 17-18 brackets
+# that otherwise have no SE age-group cut.
+def target_ages(age):
+    return ["15-16", "17-18"] if age == "OPEN" else [age]
 
 
 def rows_of(page, tol=4):
@@ -71,12 +78,13 @@ def main():
                 right = sorted([n for n in nums if n[0] > ex], key=lambda n: n[0])[:2]
                 left = [v for _, v in sorted(left, key=lambda n: n[0])]   # [LCM, SCY]
                 right = [v for _, v in sorted(right, key=lambda n: n[0])]  # [SCY, LCM]
-                if len(left) == 2:
-                    out.setdefault("LCM", {}).setdefault("Girls", {}).setdefault(age, {})[key] = left[0]
-                    out.setdefault("SCY", {}).setdefault("Girls", {}).setdefault(age, {})[key] = left[1]
-                if len(right) == 2:
-                    out.setdefault("SCY", {}).setdefault("Boys", {}).setdefault(age, {})[key] = right[0]
-                    out.setdefault("LCM", {}).setdefault("Boys", {}).setdefault(age, {})[key] = right[1]
+                for a in target_ages(age):
+                    if len(left) == 2:
+                        out.setdefault("LCM", {}).setdefault("Girls", {}).setdefault(a, {})[key] = left[0]
+                        out.setdefault("SCY", {}).setdefault("Girls", {}).setdefault(a, {})[key] = left[1]
+                    if len(right) == 2:
+                        out.setdefault("SCY", {}).setdefault("Boys", {}).setdefault(a, {})[key] = right[0]
+                        out.setdefault("LCM", {}).setdefault("Boys", {}).setdefault(a, {})[key] = right[1]
 
     json.dump(out, open("src/se_champs.json", "w", encoding="utf-8"), indent=1)
     for c in out:
