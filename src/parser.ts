@@ -148,34 +148,50 @@ function parseLines(lines: string[], out: RawEntry[]) {
   }
 }
 
-export interface ParseResult {
-  title: string;
-  entries: RawEntry[];
+export interface Finisher {
+  event: number;
+  desc: string;
+  name: string;
+  finals: string;
+}
+export type ParsedPdf =
+  | { kind: "heat"; title: string; entries: RawEntry[] }
+  | { kind: "results"; title: string; finishers: Finisher[] };
+
+function pageWords(tc: any): Word[] {
+  return tc.items
+    .filter((it: any) => typeof it.str === "string" && it.str.trim())
+    .map((it: any) => ({ x: it.transform[4], y: it.transform[5], s: it.str.trim() }));
+}
+function findTitle(words: Word[]): string {
+  const tl = [...words].sort((a, b) => b.y - a.y).find((w) =>
+    /invitational|championship|classic|meet|open|cup|sectional/i.test(w.s)
+  );
+  if (!tl) return "Meet";
+  return words.filter((w) => Math.abs(w.y - tl.y) <= 3).sort((a, b) => a.x - b.x)
+    .map((w) => w.s).join(" ").trim().replace(/(\d)\s+(\d)/g, "$1$2");
 }
 
-export async function parseHeatSheet(data: ArrayBuffer): Promise<ParseResult> {
+const EVENT_RES = /Event\s+(\d+)\s+(.+)/;
+const TIME_TOK = /^\d{0,2}:?\d{2}\.\d{2}$/;
+const NAME_RES = /[A-Za-z'.\-]+,\s+[A-Za-z'.\-]+(?:\s+[A-Za-z]\b)?/;
+
+// Parse a PDF, auto-detecting a heat sheet vs a results sheet.
+export async function parsePdf(data: ArrayBuffer): Promise<ParsedPdf> {
   const doc = await pdfjsLib.getDocument({ data }).promise;
-  const ordered: string[] = [];
+  const pages: Word[][] = [];
   let title = "Meet";
   for (let p = 1; p <= doc.numPages; p++) {
-    const page = await doc.getPage(p);
-    const tc = await page.getTextContent();
-    const words: Word[] = tc.items
-      .filter((it: any) => typeof it.str === "string" && it.str.trim())
-      .map((it: any) => ({ x: it.transform[4], y: it.transform[5], s: it.str.trim() }));
-    if (p === 1) {
-      const top = [...words].sort((a, b) => b.y - a.y);
-      const titleLine = top.find((w) =>
-        /invitational|championship|classic|meet|open|cup|sectional/i.test(w.s)
-      );
-      if (titleLine) {
-        const row = words
-          .filter((w) => Math.abs(w.y - titleLine.y) <= 3)
-          .sort((a, b) => a.x - b.x);
-        title = row.map((w) => w.s).join(" ").trim().replace(/(\d)\s+(\d)/g, "$1$2");
-      }
-    }
-    // Tag this page's events with their session from the "Meet Program - <day>" header.
+    const words = pageWords(await (await doc.getPage(p)).getTextContent());
+    if (p === 1) title = findTitle(words);
+    pages.push(words);
+  }
+  // Results sheets have a "Finals Time" column; heat sheets don't.
+  if (pages.some((w) => w.some((x) => /Finals/.test(x.s)))) {
+    return { kind: "results", title, finishers: parseResultsPages(pages) };
+  }
+  const ordered: string[] = [];
+  for (const words of pages) {
     const pageText = [...words].sort((a, b) => b.y - a.y || a.x - b.x).map((w) => w.s).join(" ");
     const sm = SESSION_HDR.exec(pageText);
     if (sm) ordered.push(SESSION_MARK + sm[1].replace(/\s+/g, " ").trim());
@@ -184,5 +200,39 @@ export async function parseHeatSheet(data: ArrayBuffer): Promise<ParseResult> {
   }
   const entries: RawEntry[] = [];
   parseLines(ordered, entries);
-  return { title, entries };
+  return { kind: "heat", title, entries };
+}
+
+// Pick, per finisher row, the time nearest the "Finals" column (vs the Seed column).
+function parseResultsPages(pages: Word[][]): Finisher[] {
+  const out: Finisher[] = [];
+  let ev: number | null = null;
+  let desc = "";
+  for (const words of pages) {
+    const finalsXs = words.filter((w) => /Finals/.test(w.s)).map((w) => w.x);
+    const fx = finalsXs.length ? finalsXs[0] : 1e9;
+    const rows = new Map<number, Word[]>();
+    for (const w of words) {
+      const k = Math.round(w.y / 2);
+      if (!rows.has(k)) rows.set(k, []);
+      rows.get(k)!.push(w);
+    }
+    for (const k of [...rows.keys()].sort((a, b) => b - a)) {
+      const row = rows.get(k)!.sort((a, b) => a.x - b.x);
+      const txt = row.map((w) => w.s).join(" ");
+      const em = EVENT_RES.exec(txt);
+      if (em) {
+        ev = parseInt(em[1], 10);
+        desc = em[2].trim();
+        continue;
+      }
+      const nm = NAME_RES.exec(txt);
+      const times = row.filter((w) => TIME_TOK.test(w.s));
+      if (nm && times.length && ev != null) {
+        const finals = times.reduce((b, t) => (Math.abs(t.x - fx) < Math.abs(b.x - fx) ? t : b)).s;
+        out.push({ event: ev, desc, name: nm[0].trim(), finals });
+      }
+    }
+  }
+  return out;
 }

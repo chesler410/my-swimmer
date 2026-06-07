@@ -19,6 +19,8 @@ import {
   buildTeams,
   importFile,
   importUrl,
+  applyResults,
+  ImportOutcome,
 } from "./store.ts";
 import { computeCut, CutResult, goalSplits, eventMeta, segInfo } from "./cuts.ts";
 import { DEFAULT_PROXY, FEEDBACK_URL } from "./config.ts";
@@ -617,16 +619,16 @@ export function App() {
     if (!files?.length) return;
     setBusy(true);
     setMsg("");
-    const added: Meet[] = [];
+    const outcomes: ImportOutcome[] = [];
     let err = "";
     for (const f of Array.from(files)) {
       try {
-        added.push(await importFile(f));
+        outcomes.push(await importFile(f));
       } catch (e: any) {
         err = e?.message || `Couldn't read ${f.name}.`;
       }
     }
-    finishImport(added, err);
+    finishImport(outcomes, err);
   }
 
   async function onUrl(url: string) {
@@ -640,15 +642,39 @@ export function App() {
     }
   }
 
-  function finishImport(added: Meet[], err: string) {
-    if (added.length) {
-      persistMeets([...added, ...meets]);
-      const total = added.reduce((n, m) => n + m.entries.length, 0);
-      setMsg(`Imported ${added.length} file(s) — ${total} swimmers found. Now pick yours below.`);
-      setNav(swimmers.length ? "home" : "swimmers");
-    } else if (err) {
-      setMsg(err);
+  function finishImport(outcomes: ImportOutcome[], err: string) {
+    const newMeets = outcomes.flatMap((o) => (o.kind === "meet" ? [o.meet] : []));
+    const resultSets = outcomes.flatMap((o) => (o.kind === "results" ? [o] : []));
+    let meetsNext = meets;
+    if (newMeets.length) {
+      meetsNext = [...newMeets, ...meets];
+      persistMeets(meetsNext);
     }
+    const parts: string[] = [];
+    if (newMeets.length) {
+      const total = newMeets.reduce((n, m) => n + m.entries.length, 0);
+      parts.push(`Imported ${newMeets.length} meet file(s) — ${total} swimmers found.`);
+    }
+    if (resultSets.length) {
+      let r = results;
+      let matched = 0;
+      for (const rs of resultSets) {
+        const applied = applyResults(rs.finishers, swimmers, meetsNext, r);
+        r = applied.results;
+        matched += applied.matched;
+      }
+      setResultsState(r);
+      saveResults(r);
+      parts.push(
+        matched > 0
+          ? `Results: filled ${matched} actual time(s) for your swimmers. 🏁`
+          : `Results read, but no times matched your swimmers — import that meet's heat sheet and pick your swimmers first.`
+      );
+    }
+    if (!outcomes.length && err) parts.push(err);
+    if ((newMeets.length || resultSets.length) && swimmers.length) setNav("home");
+    else if (newMeets.length && !swimmers.length) setNav("swimmers");
+    setMsg(parts.join(" ").trim());
     setBusy(false);
   }
 
@@ -1019,6 +1045,7 @@ function ImportView(props: { busy: boolean; msg: string; onFiles: (f: FileList |
       <div className="card">
         <h2>{t("imp_title")}</h2>
         <p className="muted">{t("imp_tip")}</p>
+        <p className="muted small">{t("imp_results")}</p>
         <input className="field" placeholder="https://…/heatsheet.pdf" value={url} onChange={(e) => setUrl(e.target.value)} inputMode="url" autoFocus />
         <button className="primary" disabled={props.busy || !url.trim()} onClick={() => props.onUrl(url)}>
           {props.busy ? t("imp_opening") : t("imp_open")}
@@ -1036,6 +1063,16 @@ function ImportView(props: { busy: boolean; msg: string; onFiles: (f: FileList |
       </div>
 
       {props.msg && <p className="importmsg">{props.msg}</p>}
+
+      <div className="card">
+        <h3>{t("src_h")}</h3>
+        <p className="muted small">{t("src_note")}</p>
+        <ul className="src-links">
+          <li><a href="https://data.usaswimming.org/datahub/usas/individualsearch" target="_blank" rel="noreferrer">USA Swimming — Individual Times Search</a></li>
+          <li><a href="https://swimstandards.com" target="_blank" rel="noreferrer">SwimStandards — time standards & best times</a></li>
+          <li><a href="https://www.swimcloud.com" target="_blank" rel="noreferrer">SwimCloud — rankings & results</a></li>
+        </ul>
+      </div>
     </div>
   );
 }

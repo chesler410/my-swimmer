@@ -1,7 +1,7 @@
 // Local-first storage (no backend/accounts): swimmers + imported meets in localStorage.
 // Meets keep their FULL parsed roster so you can search swimmers and add them any time
 // (re-matching is automatic). COPPA-friendly: nothing leaves the device.
-import { parseHeatSheet } from "./parser";
+import { parsePdf, Finisher } from "./parser";
 import { eventMeta } from "./cuts";
 
 export interface Entry {
@@ -128,14 +128,50 @@ function toMeet(title: string, entries: any[], fallback: string, source: "upload
   return { id: uid(), title: title || fallback, importedAt: Date.now(), entries: mapped, source };
 }
 
-export async function importBuffer(buf: ArrayBuffer, fallback: string, source: "upload" | "url"): Promise<Meet> {
-  const { title, entries } = await parseHeatSheet(buf);
-  if (!entries.length) throw new Error("No events found — is this a Hy-Tek heat sheet PDF?");
-  return toMeet(title, entries, fallback, source);
+export type ImportOutcome =
+  | { kind: "meet"; meet: Meet }
+  | { kind: "results"; title: string; finishers: Finisher[] };
+
+export async function importBuffer(buf: ArrayBuffer, fallback: string, source: "upload" | "url"): Promise<ImportOutcome> {
+  const r = await parsePdf(buf);
+  if (r.kind === "results") {
+    if (!r.finishers.length) throw new Error("No results found in this PDF.");
+    return { kind: "results", title: r.title, finishers: r.finishers };
+  }
+  if (!r.entries.length) throw new Error("No events found — is this a Hy-Tek heat sheet or results PDF?");
+  return { kind: "meet", meet: toMeet(r.title, r.entries, fallback, source) };
 }
 
-export async function importFile(file: File): Promise<Meet> {
+export async function importFile(file: File): Promise<ImportOutcome> {
   return importBuffer(await file.arrayBuffer(), file.name.replace(/\.pdf$/i, ""), "upload");
+}
+
+// Apply a results sheet to existing meets: fill the actual (Finals) time for each matched
+// swimmer's event (matched by name + race key + course), so cuts recompute and PBs show.
+export function applyResults(
+  finishers: Finisher[],
+  swimmers: Swimmer[],
+  meets: Meet[],
+  results: Record<string, string>
+): { results: Record<string, string>; matched: number } {
+  const next = { ...results };
+  let matched = 0;
+  for (const f of finishers) {
+    const sw = swimmers.find((s) => matchesName(s.name, f.name));
+    if (!sw) continue;
+    const fm = eventMeta(f.desc);
+    if (!fm.key) continue;
+    for (const m of meets)
+      for (const e of m.entries) {
+        if (!matchesName(sw.name, e.name)) continue;
+        const em = eventMeta(e.desc);
+        if (em.key === fm.key && em.course === fm.course) {
+          next[resultKey(m.id, e.event, sw.name)] = f.finals;
+          matched++;
+        }
+      }
+  }
+  return { results: next, matched };
 }
 
 const isPdf = (buf: ArrayBuffer) => {
@@ -163,7 +199,7 @@ export async function fetchPdfBuffer(url: string, proxy: string): Promise<ArrayB
   throw new Error("Couldn't open that link here — tap “Upload PDF” instead and pick the file.");
 }
 
-export async function importUrl(url: string, proxy: string): Promise<Meet> {
+export async function importUrl(url: string, proxy: string): Promise<ImportOutcome> {
   const buf = await fetchPdfBuffer(url.trim(), proxy);
   const fallback = url.split("/").pop()?.replace(/\.pdf.*$/i, "") || "Meet";
   return importBuffer(buf, fallback, "url");

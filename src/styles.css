@@ -527,3 +527,8 @@ table.arm th, table.arm td { padding-right: 14px; }
   /* keep the info cards readable, not super-wide */
   .disclaimer, .highlight, .fuel, .prep, .empty, .about { max-width: 680px; }
 }
+
+/* ---- sources links ---- */
+.src-links { margin: 4px 0 0; padding-left: 18px; }
+.src-links li { margin: 6px 0; font-size: 0.9rem; }
+.src-links a { color: var(--blue); }
