@@ -48,11 +48,16 @@ A rough phasing. Order matters: prove the risky part (PDF parsing) before polish
 - [ ] Offline-first / installable PWA hardening
 - [ ] Post-meet: auto-detect new PBs + cuts achieved → shareable card
 
-## Phase 5 — Family hub (the real product; user vision 2026-06-07)
+## Phase 5 — Family hub (the real product; user vision 2026-06-07) — SHIPPED core
 "I'm Dad A with 3 kids — consolidate all my kids' events on one simple page."
-- [ ] **Kid profiles** (name, age, team, LSC) stored on device; auto-match in any meet
-- [ ] **Multi-swimmer merged timeline** — all 3 kids' events in one view, by day/time
-- [ ] **Input: upload PDFs** (in-browser pdf.js parser) — the foundation, build first
+- [x] **Kid profiles** stored on device (local-first, no backend, COPPA-safe); name-match
+- [x] **Multi-swimmer merged page** — all kids' events across meets, kid filter chips
+- [x] **Input: upload PDFs** in-browser (pdf.js port; byte-identical to PyMuPDF parser)
+- [x] **Cuts for everyone** — bundled USA Swimming 2024-2028 standards (all ages,
+      both genders, LCM+SCY) parsed by scripts/build_standards.py
+- [x] **About / privacy / disclaimer / not-affiliated** page; ad-free, no paywall
+- [x] Demo mode (?demo) + cards/arm-table per meet; each uploaded PDF = a session
+- [ ] Re-match meets when a kid is added later (currently re-import needed)
 - [ ] **Input: link a meet** — paste a gomotion/meet URL → fetch its published heat-sheet
       PDFs. Needs a tiny serverless proxy (browser CORS blocks cross-origin PDF fetch).
 - [ ] **Input: search nearby meets → live published data** — AMBITIOUS / UNCERTAIN: no

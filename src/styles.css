@@ -217,3 +217,114 @@ table.arm td:nth-child(2) { font-weight: 600; }
 
 .muted { color: var(--muted); font-size: 0.8rem; }
 footer { margin-top: 20px; text-align: center; }
+
+/* ---- App shell / nav (family hub) ---- */
+.apphead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: linear-gradient(160deg, var(--blue), var(--navy));
+  color: #fff;
+  margin: 0 -14px 14px;
+  padding: calc(env(safe-area-inset-top) + 12px) 14px 10px;
+  border-radius: 0 0 16px 16px;
+}
+.brand { font-size: 1.15rem; font-weight: 800; margin-bottom: 8px; }
+.tabs { display: flex; gap: 6px; }
+.tabs button {
+  flex: 1;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: #dce8f7;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 7px 6px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.tabs button.on { background: #fff; color: var(--blue); }
+
+/* ---- chips (kid filter) ---- */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 2px 12px; }
+.chip {
+  border: 1.5px solid #c2ccd6;
+  background: #fff;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+}
+
+/* ---- empty states / buttons ---- */
+.empty { text-align: center; padding: 26px 18px; }
+.empty h2 { margin: 0 0 8px; }
+.empty p { color: var(--muted); margin: 0 auto 16px; max-width: 30em; }
+.primary {
+  display: inline-block;
+  border: none;
+  background: var(--blue);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 11px 20px;
+  border-radius: 11px;
+  cursor: pointer;
+}
+.filelabel { cursor: pointer; }
+.link {
+  display: block;
+  margin: 12px auto 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+}
+.importmsg { margin-top: 14px; }
+.field {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-size: 1rem;
+  padding: 11px 12px;
+  margin-bottom: 10px;
+  border: 1.5px solid #d3dde7;
+  border-radius: 10px;
+}
+
+/* ---- kids ---- */
+.kid-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid #f0f4f8; }
+.kid-row:first-of-type { border-top: none; }
+.kid-dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.kid-name { flex: 1; }
+.kid-tag {
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.remove {
+  border: none;
+  background: none;
+  color: #b3401f;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+/* ---- meet blocks ---- */
+.meet-block { margin-bottom: 18px; }
+.meet-head { display: flex; align-items: center; gap: 8px; margin: 6px 4px 8px; }
+.meet-head h3 { margin: 0; font-size: 1rem; color: var(--blue); flex: 1; text-transform: capitalize; }
+.meet-empty { margin: 0 6px 8px; }
+
+/* ---- about ---- */
+.about h3 { margin: 16px 0 4px; font-size: 0.95rem; }
+.about p { font-size: 0.9rem; line-height: 1.5; }
