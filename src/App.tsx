@@ -19,7 +19,7 @@ import {
   importFile,
   importUrl,
 } from "./store.ts";
-import { computeCut, CutResult } from "./cuts.ts";
+import { computeCut, CutResult, goalSplits } from "./cuts.ts";
 import { DEFAULT_PROXY, FEEDBACK_URL } from "./config.ts";
 import { getTheme, setTheme, Theme } from "./theme.ts";
 import { t, getLang, setLang, LANGS, Lang } from "./i18n.ts";
@@ -61,14 +61,25 @@ function EntryCard({
   showSwimmer,
   result,
   onSetResult,
+  goal,
+  asplits,
+  onGoal,
+  onSplits,
 }: {
   d: DE;
   showSwimmer: boolean;
   result?: string;
   onSetResult: (val: string) => void;
+  goal?: string;
+  asplits?: string;
+  onGoal?: (val: string) => void;
+  onSplits?: (val: string) => void;
 }) {
   const { e } = d;
   const [editing, setEditing] = useState(false);
+  const [showSplits, setShowSplits] = useState(false);
+  const splits = e.relay ? null : goalSplits(e.desc, goal || "");
+  const actualArr = (asplits || "").split(",").map((x) => x.trim()).filter(Boolean);
   const time = result || e.seed;
   const cut = cutFor(d, result);
   const close = cut?.nextCut && cut.nextCut.needed <= 1.0;
@@ -141,6 +152,56 @@ function EntryCard({
           </button>
         )}
       </div>
+      )}
+      {!e.relay && (
+        <div className="splits-sec">
+          <button className="inline-link" onClick={() => setShowSplits((v) => !v)}>
+            {t("splits_toggle")}
+          </button>
+          {showSplits && (
+            <div className="splits-body">
+              <input
+                className="field result-input"
+                defaultValue={goal || ""}
+                placeholder={t("goal_ph")}
+                inputMode="decimal"
+                onBlur={(ev) => onGoal?.(ev.target.value.trim())}
+                onKeyDown={(ev) => {
+                  if (ev.key === "Enter") (ev.target as HTMLInputElement).blur();
+                }}
+              />
+              {splits && (
+                <table className="splittable">
+                  <thead>
+                    <tr>
+                      <th>m</th>
+                      <th>{t("splits_target")}</th>
+                      {actualArr.length > 0 && <th>{t("swam")}</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {splits.map((s, i) => (
+                      <tr key={i}>
+                        <td className="mono">{s.dist}</td>
+                        <td className="mono">{s.cum}</td>
+                        {actualArr.length > 0 && <td className="mono actual">{actualArr[i] || "—"}</td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <input
+                className="field result-input"
+                defaultValue={asplits || ""}
+                placeholder={t("actual_ph")}
+                onBlur={(ev) => onSplits?.(ev.target.value.trim())}
+                onKeyDown={(ev) => {
+                  if (ev.key === "Enter") (ev.target as HTMLInputElement).blur();
+                }}
+              />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -230,6 +291,14 @@ function Disclaimer() {
   );
 }
 
+function loadMap(key: string): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(key) || "{}");
+  } catch {
+    return {};
+  }
+}
+
 export function App() {
   const [nav, setNav] = useState<Nav>(() => {
     const t = new URLSearchParams(location.search).get("tab");
@@ -244,6 +313,8 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [results, setResultsState] = useState<Record<string, string>>(loadResults);
+  const [goals, setGoalsState] = useState<Record<string, string>>(() => loadMap("goals"));
+  const [asplits, setAsplitsState] = useState<Record<string, string>>(() => loadMap("actualsplits"));
   const [theme, setThemeState] = useState<Theme>(getTheme);
   const [lang, setLangState] = useState<Lang>(getLang);
 
@@ -261,6 +332,23 @@ export function App() {
     else delete next[k];
     setResultsState(next);
     saveResults(next);
+  }
+  function setMap(
+    kind: "goal" | "splits",
+    meetId: string,
+    event: number,
+    name: string,
+    val: string
+  ) {
+    const map = kind === "goal" ? goals : asplits;
+    const setter = kind === "goal" ? setGoalsState : setAsplitsState;
+    const storeKey = kind === "goal" ? "goals" : "actualsplits";
+    const next = { ...map };
+    const k = resultKey(meetId, event, name);
+    if (val.trim()) next[k] = val.trim();
+    else delete next[k];
+    setter(next);
+    localStorage.setItem(storeKey, JSON.stringify(next));
   }
   function cycleTheme() {
     const order: Theme[] = ["auto", "light", "dark"];
@@ -374,6 +462,9 @@ export function App() {
           removeMeet={(id) => persistMeets(meets.filter((m) => m.id !== id))}
           results={results}
           setResult={setResult}
+          goals={goals}
+          asplits={asplits}
+          setMap={setMap}
         />
       )}
       {nav === "import" && <ImportView busy={busy} msg={msg} onFiles={onFiles} onUrl={onUrl} goAbout={() => setNav("about")} />}
@@ -419,7 +510,7 @@ function bySession(items: DE[]): { label: string; items: DE[] }[] {
 }
 
 function Home(props: any) {
-  const { swimmers, meets, view, pickView, filter, toggleFilter, results, setResult } = props;
+  const { swimmers, meets, view, pickView, filter, toggleFilter, results, setResult, goals, asplits, setMap } = props;
   const [showSample, setShowSample] = useState(() => location.search.includes("demo"));
   const [cols, setCols] = useState<{ pb: boolean; cut: boolean }>(() => {
     try {
@@ -525,15 +616,22 @@ function Home(props: any) {
                   <div className="session-block" key={sec.label}>
                     {sec.label !== "Events" && <div className="session-head">📅 {sec.label}</div>}
                     {view === "cards" ? (
-                      sec.items.map((d, i) => (
-                        <EntryCard
-                          key={i}
-                          d={d}
-                          showSwimmer={swimmers.length > 1}
-                          result={resultOf(d)}
-                          onSetResult={(v: string) => setResult(d.meetId, d.e.event, d.swimmer, v)}
-                        />
-                      ))
+                      sec.items.map((d, i) => {
+                        const k = resultKey(d.meetId, d.e.event, d.swimmer);
+                        return (
+                          <EntryCard
+                            key={i}
+                            d={d}
+                            showSwimmer={swimmers.length > 1}
+                            result={resultOf(d)}
+                            onSetResult={(v: string) => setResult(d.meetId, d.e.event, d.swimmer, v)}
+                            goal={goals[k]}
+                            asplits={asplits[k]}
+                            onGoal={(v: string) => setMap("goal", d.meetId, d.e.event, d.swimmer, v)}
+                            onSplits={(v: string) => setMap("splits", d.meetId, d.e.event, d.swimmer, v)}
+                          />
+                        );
+                      })
                     ) : (
                       <ArmTable items={sec.items} results={results} cols={cols} />
                     )}

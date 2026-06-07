@@ -450,3 +450,12 @@ footer { margin-top: 20px; text-align: center; }
   max-width: 110px;
 }
 .lang-sel option { color: #0f2233; }
+
+/* ---- goal splits ---- */
+.splits-sec { margin-top: 4px; }
+.splits-body { margin-top: 8px; }
+.splittable { border-collapse: collapse; margin: 8px 0; font-size: 0.85rem; }
+.splittable th { text-align: left; font-size: 0.68rem; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); padding: 2px 16px 4px 0; }
+.splittable td { padding: 3px 16px 3px 0; border-top: 1px solid #eef2f6; }
+.theme-dark .splittable td { border-color: #202b36; }
+.splittable .actual { color: var(--close); font-weight: 600; }

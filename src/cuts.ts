@@ -83,6 +83,21 @@ export interface CutResult {
   champ: { time: string; met: boolean; needed: number } | null; // Southeastern champ cut
 }
 
+// Even-split goal pacing: cumulative target at each pool length for a goal time.
+export function goalSplits(desc: string, goal: string): { dist: number; cum: string }[] | null {
+  if (!goal) return null;
+  const m = eventMeta(desc);
+  if (!m.course || !m.key) return null;
+  const dist = parseInt(m.key, 10);
+  const len = m.course === "LCM" ? 50 : 25; // length of pool
+  const n = Math.round(dist / len);
+  const g = toSec(goal);
+  if (!(n >= 2) || !g || isNaN(g)) return null;
+  const out: { dist: number; cum: string }[] = [];
+  for (let k = 1; k <= n; k++) out.push({ dist: k * len, cum: fmt((g * k) / n) });
+  return out;
+}
+
 export function computeCut(
   desc: string,
   seed: string,
