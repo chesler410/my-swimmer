@@ -54,7 +54,9 @@ export function eventMeta(desc: string): EventMeta {
     const word = dm[2].trim().split(/\s+/)[0];
     const isIM = /individual medley|IM/i.test(dm[2]);
     const abbr = isIM ? "IM" : STROKE_ABBR[word] ?? word;
-    const title = isIM ? "IM" : STROKE_TITLE[abbr] ?? word;
+    // Short nickname keyed by abbreviation: Butterfly→Fly, Freestyle→Free, etc.
+    const ABBR_TITLE: Record<string, string> = { FR: "Free", BK: "Back", BR: "Breast", FL: "Fly", IM: "IM" };
+    const title = isIM ? "IM" : ABBR_TITLE[abbr] ?? word;
     key = `${dist} ${abbr}`;
     race = `${dist} ${title}`;
   }
@@ -94,8 +96,13 @@ export function segInfo(desc: string): { dist: number; len: number; unit: string
   return { dist, len, unit, n };
 }
 
-// Even-split goal pacing: cumulative target at each pool length for a goal time.
-export function goalSplits(desc: string, goal: string): { dist: number; cum: string }[] | null {
+// Goal pacing: cumulative target at each pool length. "even" = equal pace; "realistic"
+// = mild positive split (first half a touch faster, like a real race), summing to the goal.
+export function goalSplits(
+  desc: string,
+  goal: string,
+  pacing: "even" | "realistic" = "even"
+): { dist: number; cum: string }[] | null {
   if (!goal) return null;
   const m = eventMeta(desc);
   if (!m.course || !m.key) return null;
@@ -104,8 +111,15 @@ export function goalSplits(desc: string, goal: string): { dist: number; cum: str
   const n = Math.round(dist / len);
   const g = toSec(goal);
   if (!(n >= 2) || !g || isNaN(g)) return null;
+  // per-length weights (sum to n). realistic: spread of ±3% from first to last length.
+  const spread = 0.06;
+  const w = (k: number) => (pacing === "realistic" ? 1 + spread * ((k - 1) / (n - 1) - 0.5) : 1);
   const out: { dist: number; cum: string }[] = [];
-  for (let k = 1; k <= n; k++) out.push({ dist: k * len, cum: fmt((g * k) / n) });
+  let cum = 0;
+  for (let k = 1; k <= n; k++) {
+    cum += (g / n) * w(k);
+    out.push({ dist: k * len, cum: fmt(cum) });
+  }
   return out;
 }
 

@@ -16,7 +16,8 @@ import re
 import fitz
 
 SRC = "scripts/sources/se_lc_champs.pdf"
-STROKE = {"Free": "FR", "Back": "BK", "Breast": "BR", "Fly": "FL", "IM": "IM"}
+# NB: the SE doc labels breast "Breast" for the 50 but "Brst" for 100/200.
+STROKE = {"Free": "FR", "Back": "BK", "Breast": "BR", "Brst": "BR", "Fly": "FL", "IM": "IM"}
 AGE_RE = re.compile(r"(8&UNDER|10&UNDER|11&12|13&14|15&16|17&18|OPEN|SENIOR)", re.I)
 EVENT_RE = re.compile(r"^(\d+)\s+(Free|Back|Breast|Fly|IM)$")
 NUM_RE = re.compile(r"^[\d:]+\.\d{2}$")

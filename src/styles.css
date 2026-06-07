@@ -497,3 +497,9 @@ footer { margin-top: 20px; text-align: center; }
 .prep-body h4 { margin: 12px 0 4px; font-size: 0.9rem; color: var(--blue); }
 .prep-body ul { margin: 0; padding-left: 18px; }
 .prep-body li { margin: 4px 0; font-size: 0.88rem; line-height: 1.4; }
+
+/* ---- fuel extras: inputs row, between, pace toggle ---- */
+.fuel-inputs { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+.between-h { margin: 14px 0 4px; font-size: 0.9rem; color: var(--blue); }
+.pace-seg { margin: 8px 0; align-items: center; }
+.pace-label { font-size: 0.75rem; color: var(--muted); padding: 0 8px 0 4px; }

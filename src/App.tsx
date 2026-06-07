@@ -66,6 +66,8 @@ function EntryCard({
   asplits,
   onGoal,
   onSplits,
+  pacing,
+  setPacing,
 }: {
   d: DE;
   showSwimmer: boolean;
@@ -75,11 +77,13 @@ function EntryCard({
   asplits?: string;
   onGoal?: (val: string) => void;
   onSplits?: (val: string) => void;
+  pacing?: "even" | "realistic";
+  setPacing?: (p: "even" | "realistic") => void;
 }) {
   const { e } = d;
   const [editing, setEditing] = useState(false);
   const [showSplits, setShowSplits] = useState(false);
-  const splits = e.relay ? null : goalSplits(e.desc, goal || "");
+  const splits = e.relay ? null : goalSplits(e.desc, goal || "", pacing || "even");
   const actualArr = (asplits || "").split(",").map((x) => x.trim()).filter(Boolean);
   const seg = e.relay ? null : segInfo(e.desc);
   const time = result || e.seed;
@@ -193,6 +197,17 @@ function EntryCard({
                   if (ev.key === "Enter") (ev.target as HTMLInputElement).blur();
                 }}
               />
+              {splits && setPacing && (
+                <div className="seg pace-seg">
+                  <span className="pace-label">{t("pace_label")}</span>
+                  <button className={pacing === "even" ? "on" : ""} onClick={() => setPacing("even")}>
+                    {t("pace_even")}
+                  </button>
+                  <button className={pacing === "realistic" ? "on" : ""} onClick={() => setPacing("realistic")}>
+                    {t("pace_real")}
+                  </button>
+                </div>
+              )}
               {splits && (
                 <table className="splittable">
                   <thead>
@@ -300,7 +315,42 @@ function fmtClock(mins: number): string {
   return `${h12}:${mm} ${ap}`;
 }
 
+function icsDateTime(dateStr: string, mins: number): string {
+  const [y, mo, da] = dateStr.split("-");
+  const m = ((mins % 1440) + 1440) % 1440;
+  return `${y}${mo}${da}T${String(Math.floor(m / 60)).padStart(2, "0")}${String(m % 60).padStart(2, "0")}00`;
+}
+function buildIcs(dateStr: string, start: number): string {
+  const events: [number, string][] = [
+    [start - 75, t("ics_carbs")],
+    [start - 30, t("ics_hydrate")],
+    [start - 20, t("ics_warm")],
+  ];
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+  let s = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//my-swimmer//EN\r\nCALSCALE:GREGORIAN\r\n";
+  events.forEach(([mins, title], i) => {
+    s +=
+      "BEGIN:VEVENT\r\n" +
+      `UID:ms-${dateStr}-${i}-${Math.random().toString(36).slice(2)}@my-swimmer\r\n` +
+      `DTSTAMP:${stamp}\r\nDTSTART:${icsDateTime(dateStr, mins)}\r\nDURATION:PT5M\r\n` +
+      `SUMMARY:🏊 ${title}\r\n` +
+      `BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:${title}\r\nTRIGGER:-PT5M\r\nEND:VALARM\r\n` +
+      "END:VEVENT\r\n";
+  });
+  return s + "END:VCALENDAR\r\n";
+}
+function downloadIcs(text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/calendar" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "my-swimmer-fuel.ics";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
 function Fueling() {
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(() => localStorage.getItem("meetDate") || today);
   const [time, setTime] = useState(() => localStorage.getItem("firstRaceTime") || "");
   const start = parseHM(time);
   const by = (off: number) => (start != null ? t("fuel_by", { t: fmtClock(start + off) }) : "");
@@ -308,17 +358,30 @@ function Fueling() {
   return (
     <section className="card fuel">
       <h2>💧 {t("fuel_title")}</h2>
-      <label className="fuel-time">
-        {t("fuel_first")}{" "}
-        <input
-          type="time"
-          value={time}
-          onChange={(e) => {
-            setTime(e.target.value);
-            localStorage.setItem("firstRaceTime", e.target.value);
-          }}
-        />
-      </label>
+      <div className="fuel-inputs">
+        <label className="fuel-time">
+          {t("fuel_date")}{" "}
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => {
+              setDate(e.target.value);
+              localStorage.setItem("meetDate", e.target.value);
+            }}
+          />
+        </label>
+        <label className="fuel-time">
+          {t("fuel_first")}{" "}
+          <input
+            type="time"
+            value={time}
+            onChange={(e) => {
+              setTime(e.target.value);
+              localStorage.setItem("firstRaceTime", e.target.value);
+            }}
+          />
+        </label>
+      </div>
       <ul>
         <li>{t("fuel_1")}</li>
         <li><b>{by(-75)}</b>{t("fuel_2")}</li>
@@ -326,6 +389,19 @@ function Fueling() {
         <li><b>{by(-25)}</b>{t("fuel_5")}</li>
         <li>{t("fuel_3")}</li>
       </ul>
+      {start != null && (
+        <button className="secondary" onClick={() => downloadIcs(buildIcs(date, start))}>
+          {t("ics_btn")}
+        </button>
+      )}
+      <h4 className="between-h">🥤 {t("between_h")}</h4>
+      <ul>
+        <li>{t("btw_short")}</li>
+        <li>{t("btw_mid")}</li>
+        <li>{t("btw_long")}</li>
+        <li>{t("btw_session")}</li>
+      </ul>
+      <p className="muted small">{t("hydrate_note")}</p>
     </section>
   );
 }
@@ -442,6 +518,13 @@ export function App() {
   const [asplits, setAsplitsState] = useState<Record<string, string>>(() => loadMap("actualsplits"));
   const [theme, setThemeState] = useState<Theme>(getTheme);
   const [lang, setLangState] = useState<Lang>(getLang);
+  const [pacing, setPacingState] = useState<"even" | "realistic">(
+    () => (localStorage.getItem("pacing") as "even" | "realistic") || "even"
+  );
+  function setPacing(p: "even" | "realistic") {
+    setPacingState(p);
+    localStorage.setItem("pacing", p);
+  }
 
   function changeLang(l: Lang) {
     setLang(l);
@@ -591,6 +674,8 @@ export function App() {
           goals={goals}
           asplits={asplits}
           setMap={setMap}
+          pacing={pacing}
+          setPacing={setPacing}
         />
       )}
       {nav === "import" && <ImportView busy={busy} msg={msg} onFiles={onFiles} onUrl={onUrl} goAbout={() => setNav("about")} />}
@@ -705,7 +790,7 @@ function bySession(items: DE[]): { label: string; items: DE[] }[] {
 }
 
 function Home(props: any) {
-  const { swimmers, meets, view, pickView, filter, toggleFilter, results, setResult, goals, asplits, setMap } = props;
+  const { swimmers, meets, view, pickView, filter, toggleFilter, results, setResult, goals, asplits, setMap, pacing, setPacing } = props;
   const [showSample, setShowSample] = useState(() => location.search.includes("demo"));
   const [cols, setCols] = useState<{ pb: boolean; cut: boolean; champ: boolean }>(() => {
     try {
@@ -829,6 +914,8 @@ function Home(props: any) {
                             asplits={asplits[k]}
                             onGoal={(v: string) => setMap("goal", d.meetId, d.e.event, d.swimmer, v)}
                             onSplits={(v: string) => setMap("splits", d.meetId, d.e.event, d.swimmer, v)}
+                            pacing={pacing}
+                            setPacing={setPacing}
                           />
                         );
                       })
