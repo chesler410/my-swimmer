@@ -26,6 +26,10 @@ export interface EventMeta {
   race: string; // e.g. "100 Fly"
 }
 
+export function ageToGroup(age: number): string {
+  return age <= 10 ? "10U" : age <= 12 ? "11-12" : age <= 14 ? "13-14" : age <= 16 ? "15-16" : "17-18";
+}
+
 export function eventMeta(desc: string): EventMeta {
   const gender = /girls?|women/i.test(desc)
     ? "Girls"
@@ -79,18 +83,28 @@ export interface CutResult {
   champ: { time: string; met: boolean; needed: number } | null; // Southeastern champ cut
 }
 
-export function computeCut(desc: string, seed: string): CutResult | null {
+export function computeCut(
+  desc: string,
+  seed: string,
+  override?: { age?: number | null; gender?: "Girls" | "Boys" | null }
+): CutResult | null {
   if (seed === "NT") return null;
   const m = eventMeta(desc);
-  if (!m.gender || !m.ageGroup || !m.course || !m.key) return null;
-  const ladder = standards[m.course]?.[m.gender]?.[m.ageGroup]?.[m.key];
+  // The swimmer's known age/gender (from the latest heat sheet) win over the event text —
+  // this fixes "Open"/mixed events and keeps standards correct as a swimmer ages up.
+  const gender = override?.gender ?? m.gender;
+  const ageGroup = override?.age != null ? ageToGroup(override.age) : m.ageGroup;
+  const course = m.course;
+  const key = m.key;
+  if (!gender || !ageGroup || !course || !key) return null;
+  const ladder = standards[course]?.[gender]?.[ageGroup]?.[key];
   if (!ladder) return null;
 
   const seedSec = toSec(seed);
 
   // Southeastern championship qualifying cut (single time per event), if available.
   let champ: CutResult["champ"] = null;
-  const champStr = seChamps[m.course]?.[m.gender]?.[m.ageGroup]?.[m.key];
+  const champStr = seChamps[course]?.[gender]?.[ageGroup]?.[key];
   if (champStr) {
     const t = toSec(champStr);
     champ = { time: fmt(t), met: seedSec <= t, needed: +(seedSec - t).toFixed(2) };

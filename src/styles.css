@@ -366,29 +366,28 @@ footer { margin-top: 20px; text-align: center; }
 .session-head { font-weight: 700; color: var(--blue); font-size: 0.9rem; margin: 12px 4px 8px; }
 
 /* ---- dark mode ---- */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0d141c; --card: #161f2a; --ink: #e7eef5; --muted: #93a3b3;
-    --blue: #5b9bff; --close: #34d07f;
-  }
-  .card { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45); }
-  .disclaimer { background: #3a300f; border-color: #6a560f; color: #f3e3a0; }
-  .seg { background: #26313f; }
-  .seg button.on { background: #0d141c; color: #cfe0ff; }
-  .highlight { background: linear-gradient(160deg, #15293a, #161f2a); border-color: #234058; }
-  .lane { background: #26313f; color: #bcd3ff; }
-  .field, .result { background: #0f1822; border-color: #2a3744; color: var(--ink); }
-  .field::placeholder { color: #6b7c8c; }
-  .chip { background: #161f2a; border-color: #33414f; color: var(--muted); }
-  table.arm th { border-color: #2a3744; }
-  table.arm td { border-color: #202b36; }
-  .cut, .kid-row, .hl-row { border-color: #202b36; }
-  .importmsg { background: #13283d; border-color: #244a6b; color: #cfe6ff; }
-  .about code { background: #26313f; }
-  .sample { border-color: #2a3744; }
-  .champ-need { color: #ff9d6b; }
-  .result-meta, .ev-meta { color: var(--muted); }
+/* ---- dark theme (forced via html.theme-dark, set by theme.ts) ---- */
+.theme-dark {
+  --bg: #0d141c; --card: #161f2a; --ink: #e7eef5; --muted: #93a3b3;
+  --blue: #5b9bff; --close: #34d07f;
 }
+.theme-dark .card { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45); }
+.theme-dark .disclaimer { background: #3a300f; border-color: #6a560f; color: #f3e3a0; }
+.theme-dark .seg { background: #26313f; }
+.theme-dark .seg button.on { background: #0d141c; color: #cfe0ff; }
+.theme-dark .highlight { background: linear-gradient(160deg, #15293a, #161f2a); border-color: #234058; }
+.theme-dark .lane { background: #26313f; color: #bcd3ff; }
+.theme-dark .field, .theme-dark .result { background: #0f1822; border-color: #2a3744; color: var(--ink); }
+.theme-dark .field::placeholder { color: #6b7c8c; }
+.theme-dark .chip { background: #161f2a; border-color: #33414f; color: var(--muted); }
+.theme-dark table.arm th { border-color: #2a3744; }
+.theme-dark table.arm td { border-color: #202b36; }
+.theme-dark .cut, .theme-dark .kid-row, .theme-dark .hl-row { border-color: #202b36; }
+.theme-dark .importmsg { background: #13283d; border-color: #244a6b; color: #cfe6ff; }
+.theme-dark .about code { background: #26313f; }
+.theme-dark .sample { border-color: #2a3744; }
+.theme-dark .champ-need { color: #ff9d6b; }
+.theme-dark .result-meta, .theme-dark .ev-meta { color: var(--muted); }
 
 /* secondary (backup) button */
 .secondary {
@@ -403,3 +402,31 @@ footer { margin-top: 20px; text-align: center; }
   border-radius: 11px;
   cursor: pointer;
 }
+
+/* ---- header theme switch ---- */
+.brandrow { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.brandrow .brand { margin-bottom: 0; }
+.theme-btn {
+  border: 1px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* ---- arm-table column chips ---- */
+.colchips { display: flex; align-items: center; gap: 8px; margin: 0 4px 10px; font-size: 0.82rem; color: var(--muted); }
+.chip.sm { padding: 3px 12px; font-size: 0.8rem; }
+
+/* ---- manual result entry ---- */
+.result-entry { margin-top: 8px; }
+.result-input { margin: 6px 0 0; max-width: 220px; }
+.event.has-result { border-left: 4px solid var(--close); }
+
+/* ---- how-to list ---- */
+.howto { margin: 0; padding-left: 20px; }
+.howto li { margin: 7px 0; font-size: 0.9rem; line-height: 1.45; }

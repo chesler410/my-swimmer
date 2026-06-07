@@ -10,6 +10,9 @@ import {
   saveMeets,
   loadProxy,
   saveProxy,
+  loadResults,
+  saveResults,
+  resultKey,
   makeSwimmer,
   matchesName,
   buildRoster,
@@ -18,6 +21,7 @@ import {
 } from "./store.ts";
 import { computeCut, CutResult } from "./cuts.ts";
 import { DEFAULT_PROXY } from "./config.ts";
+import { getTheme, setTheme, Theme } from "./theme.ts";
 import day from "./day.json";
 
 type Nav = "home" | "import" | "swimmers" | "about";
@@ -43,14 +47,32 @@ interface DE {
   e: Entry;
   color: string;
   swimmer: string;
-  cut: CutResult | null;
+  age?: number;
+  gender?: "Girls" | "Boys";
+  meetId: string;
 }
 
-function EntryCard({ d, showSwimmer }: { d: DE; showSwimmer: boolean }) {
-  const { e, cut } = d;
+const cutFor = (d: DE, result?: string): CutResult | null =>
+  computeCut(d.e.desc, result || d.e.seed, { age: d.age, gender: d.gender });
+
+function EntryCard({
+  d,
+  showSwimmer,
+  result,
+  onSetResult,
+}: {
+  d: DE;
+  showSwimmer: boolean;
+  result?: string;
+  onSetResult: (val: string) => void;
+}) {
+  const { e } = d;
+  const [editing, setEditing] = useState(false);
+  const time = result || e.seed;
+  const cut = cutFor(d, result);
   const close = cut?.nextCut && cut.nextCut.needed <= 1.0;
   return (
-    <div className={"card event" + (close ? " close" : "")}>
+    <div className={"card event" + (close ? " close" : "") + (result ? " has-result" : "")}>
       <div className="ev-top">
         {showSwimmer && (
           <span className="kid-tag" style={{ background: d.color }}>
@@ -65,9 +87,20 @@ function EntryCard({ d, showSwimmer }: { d: DE; showSwimmer: boolean }) {
         <span>{e.heat ?? "Heat TBD"}</span>
         <span className="lane">Lane {e.lane}</span>
         <span>
-          Best <strong>{e.seed}</strong>
+          {result ? "Swam" : "Seed"} <strong>{time}</strong>
         </span>
       </div>
+      {/* SE championship cut shown first — it's the priority target */}
+      {cut?.champ && (
+        <div className="champ">
+          <span>🏆 SE Champ {cut.champ.time}</span>
+          {cut.champ.met ? (
+            <span className="champ-met">made it ✓</span>
+          ) : (
+            <span className="champ-need">need {cut.champ.needed.toFixed(2)}s</span>
+          )}
+        </div>
+      )}
       {cut?.nextCut ? (
         <div className="cut">
           <span>
@@ -77,28 +110,55 @@ function EntryCard({ d, showSwimmer }: { d: DE; showSwimmer: boolean }) {
             drop {cut.nextCut.needed.toFixed(2)}s{close ? " — so close! 🔥" : ""}
           </span>
         </div>
+      ) : cut ? (
+        <div className="cut muted">Top standard reached 🏆</div>
       ) : (
         <div className="cut muted">No standard for this event</div>
       )}
-      {cut?.champ && (
-        <div className="champ">
-          <span>🏆 SE Champ {cut.champ.time}</span>
-          {cut.champ.met ? (
-            <span className="champ-met">qualified ✓</span>
-          ) : (
-            <span className="champ-need">need {cut.champ.needed.toFixed(2)}s</span>
-          )}
-        </div>
-      )}
+      <div className="result-entry">
+        {editing ? (
+          <input
+            className="field result-input"
+            autoFocus
+            defaultValue={result || ""}
+            placeholder="Time swum, e.g. 1:38.50"
+            inputMode="decimal"
+            onBlur={(ev) => {
+              onSetResult(ev.target.value.trim());
+              setEditing(false);
+            }}
+            onKeyDown={(ev) => {
+              if (ev.key === "Enter") (ev.target as HTMLInputElement).blur();
+            }}
+          />
+        ) : (
+          <button className="inline-link" onClick={() => setEditing(true)}>
+            {result ? "✎ edit swum time" : "＋ add the time they swam"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-function ArmTable({ items }: { items: DE[] }) {
+function ArmTable({
+  items,
+  results,
+  cols,
+}: {
+  items: DE[];
+  results: Record<string, string>;
+  cols: { pb: boolean; cut: boolean };
+}) {
   const multi = new Set(items.map((d) => d.swimmer)).size > 1;
   const sorted = [...items].sort(
     (a, b) => (a.e.team || "").localeCompare(b.e.team || "") || a.e.event - b.e.event
   );
+  const pbOf = (d: DE) => results[resultKey(d.meetId, d.e.event, d.swimmer)] || d.e.seed;
+  const cutOf = (d: DE) => {
+    const c = cutFor(d, results[resultKey(d.meetId, d.e.event, d.swimmer)]);
+    return c?.nextCut ? `${c.nextCut.level} ${c.nextCut.time}` : "—";
+  };
   return (
     <div className="card">
       <table className="arm">
@@ -106,9 +166,11 @@ function ArmTable({ items }: { items: DE[] }) {
           <tr>
             {multi && <th>Who</th>}
             <th>Ev</th>
-            <th>Swim</th>
             <th>Ht</th>
             <th>Ln</th>
+            <th>Swim</th>
+            {cols.pb && <th>PB</th>}
+            {cols.cut && <th>Cut</th>}
           </tr>
         </thead>
         <tbody>
@@ -116,14 +178,16 @@ function ArmTable({ items }: { items: DE[] }) {
             <tr key={i}>
               {multi && <td style={{ color: d.color, fontWeight: 600 }}>{firstName(d.swimmer)}</td>}
               <td className="mono">{d.e.event}</td>
-              <td>{swimAbbr(d.e.race)}</td>
               <td className="mono">{heatNum(d.e.heat)}</td>
               <td className="mono">{d.e.lane}</td>
+              <td>{swimAbbr(d.e.race)}</td>
+              {cols.pb && <td className="mono">{pbOf(d)}</td>}
+              {cols.cut && <td className="mono">{cutOf(d)}</td>}
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="muted arm-note">Ev = event #, Ht = heat, Ln = lane. FR free · BK back · BR breast · FL fly · IM.</p>
+      <p className="muted arm-note">Ev = event, Ht = heat, Ln = lane. FR free · BK back · BR breast · FL fly · IM.</p>
     </div>
   );
 }
@@ -177,8 +241,25 @@ export function App() {
   const [filter, setFilter] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [results, setResultsState] = useState<Record<string, string>>(loadResults);
+  const [theme, setThemeState] = useState<Theme>(getTheme);
 
   const roster = useMemo(() => buildRoster(meets), [meets]);
+
+  function setResult(meetId: string, event: number, name: string, val: string) {
+    const next = { ...results };
+    const k = resultKey(meetId, event, name);
+    if (val.trim()) next[k] = val.trim();
+    else delete next[k];
+    setResultsState(next);
+    saveResults(next);
+  }
+  function cycleTheme() {
+    const order: Theme[] = ["auto", "light", "dark"];
+    const next = order[(order.indexOf(theme) + 1) % 3];
+    setThemeState(next);
+    setTheme(next);
+  }
 
   function persistSwimmers(s: Swimmer[]) {
     setSwimmers(s);
@@ -192,10 +273,10 @@ export function App() {
     setView(v);
     localStorage.setItem("view", v);
   }
-  function addSwimmer(name: string, team: string) {
+  function addSwimmer(name: string, team: string, age?: number, gender?: "Girls" | "Boys") {
     if (!name.trim()) return;
     if (swimmers.some((s) => matchesName(s.name, name) && (s.team || "") === (team || ""))) return;
-    persistSwimmers([...swimmers, makeSwimmer(name, team, swimmers.length)]);
+    persistSwimmers([...swimmers, makeSwimmer(name, team, swimmers.length, age, gender)]);
   }
   function removeSwimmer(id: string) {
     persistSwimmers(swimmers.filter((s) => s.id !== id));
@@ -248,7 +329,12 @@ export function App() {
   return (
     <div className="app">
       <header className="apphead">
-        <div className="brand">🏊 my-swimmer</div>
+        <div className="brandrow">
+          <div className="brand">🏊 my-swimmer</div>
+          <button className="theme-btn" onClick={cycleTheme} aria-label="Theme" title={`Theme: ${theme}`}>
+            {theme === "auto" ? "🅰 Auto" : theme === "light" ? "☀ Light" : "🌙 Dark"}
+          </button>
+        </div>
         <nav className="tabs">
           {(["home", "import", "swimmers", "about"] as Nav[]).map((t) => (
             <button key={t} className={nav === t ? "on" : ""} onClick={() => setNav(t)}>
@@ -269,6 +355,8 @@ export function App() {
           goImport={() => setNav("import")}
           goSwimmers={() => setNav("swimmers")}
           removeMeet={(id) => persistMeets(meets.filter((m) => m.id !== id))}
+          results={results}
+          setResult={setResult}
         />
       )}
       {nav === "import" && <ImportView busy={busy} msg={msg} onFiles={onFiles} onUrl={onUrl} goAbout={() => setNav("about")} />}
@@ -293,7 +381,7 @@ function buildDisplay(meets: Meet[], swimmers: Swimmer[], filter: Set<string>) {
     for (const s of active)
       for (const e of m.entries)
         if (matchesName(s.name, e.name))
-          items.push({ e, color: s.color, swimmer: s.name, cut: computeCut(e.desc, e.seed) });
+          items.push({ e, color: s.color, swimmer: s.name, age: s.age, gender: s.gender, meetId: m.id });
     items.sort((a, b) => a.e.event - b.e.event);
     return { meet: m, items };
   });
@@ -314,12 +402,26 @@ function bySession(items: DE[]): { label: string; items: DE[] }[] {
 }
 
 function Home(props: any) {
-  const { swimmers, meets, view, pickView, filter, toggleFilter } = props;
+  const { swimmers, meets, view, pickView, filter, toggleFilter, results, setResult } = props;
   const [showSample, setShowSample] = useState(() => location.search.includes("demo"));
+  const [cols, setCols] = useState<{ pb: boolean; cut: boolean }>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("armcols") || '{"pb":true,"cut":false}');
+    } catch {
+      return { pb: true, cut: false };
+    }
+  });
+  function toggleCol(k: "pb" | "cut") {
+    const next = { ...cols, [k]: !cols[k] };
+    setCols(next);
+    localStorage.setItem("armcols", JSON.stringify(next));
+  }
+  const resultOf = (d: DE) => results[resultKey(d.meetId, d.e.event, d.swimmer)];
   const groups = buildDisplay(meets, swimmers, filter);
   const all = groups.flatMap((g: any) => g.items as DE[]);
-  const closest = [...all]
-    .filter((d) => d.cut?.nextCut)
+  const closest = all
+    .map((d: DE) => ({ d, cut: cutFor(d, resultOf(d)) }))
+    .filter((x) => x.cut?.nextCut)
     .sort((a, b) => a.cut!.nextCut!.needed - b.cut!.nextCut!.needed)
     .slice(0, 3);
 
@@ -355,14 +457,14 @@ function Home(props: any) {
           {closest.length > 0 && (
             <section className="card highlight">
               <h2>🎯 Closest to a new cut</h2>
-              {closest.map((d, i) => (
+              {closest.map(({ d, cut }: any, i: number) => (
                 <div className="hl-row" key={i}>
                   <span>
                     {swimmers.length > 1 ? `${firstName(d.swimmer)} · ` : ""}
                     {d.e.race}
                   </span>
                   <span className="hl-need">
-                    {d.cut!.nextCut!.level} in {d.cut!.nextCut!.needed.toFixed(2)}s
+                    {cut.nextCut.level} in {cut.nextCut.needed.toFixed(2)}s
                   </span>
                 </div>
               ))}
@@ -380,6 +482,17 @@ function Home(props: any) {
               </button>
             </div>
           </div>
+          {view === "table" && (
+            <div className="colchips">
+              Columns:
+              <button className={"chip sm" + (cols.pb ? " on" : "")} onClick={() => toggleCol("pb")}>
+                PB
+              </button>
+              <button className={"chip sm" + (cols.cut ? " on" : "")} onClick={() => toggleCol("cut")}>
+                Cut
+              </button>
+            </div>
+          )}
           {groups.map(({ meet, items }: any) => (
             <div className="meet-block" key={meet.id}>
               <div className="meet-head">
@@ -395,9 +508,17 @@ function Home(props: any) {
                   <div className="session-block" key={sec.label}>
                     {sec.label !== "Events" && <div className="session-head">📅 {sec.label}</div>}
                     {view === "cards" ? (
-                      sec.items.map((d, i) => <EntryCard key={i} d={d} showSwimmer={swimmers.length > 1} />)
+                      sec.items.map((d, i) => (
+                        <EntryCard
+                          key={i}
+                          d={d}
+                          showSwimmer={swimmers.length > 1}
+                          result={resultOf(d)}
+                          onSetResult={(v: string) => setResult(d.meetId, d.e.event, d.swimmer, v)}
+                        />
+                      ))
                     ) : (
-                      <ArmTable items={sec.items} />
+                      <ArmTable items={sec.items} results={results} cols={cols} />
                     )}
                   </div>
                 ))
@@ -428,13 +549,15 @@ function SampleBlock({ open, setOpen }: { open: boolean; setOpen: (b: boolean) =
               e: { ...e, name: "Sample Swimmer", team: "DEMO-SE", session: `Day ${e.day}` },
               color: "#9aa7b3",
               swimmer: "Sample Swimmer",
-              cut: computeCut(e.desc, e.seed),
+              age: 10,
+              gender: "Girls" as const,
+              meetId: "sample",
             }))
           ).map((sec) => (
             <div className="session-block" key={sec.label}>
               <div className="session-head">📅 {sec.label}</div>
               {sec.items.map((d2, i) => (
-                <EntryCard key={i} d={d2} showSwimmer={false} />
+                <EntryCard key={i} d={d2} showSwimmer={false} result={undefined} onSetResult={() => {}} />
               ))}
             </div>
           ))}
@@ -487,7 +610,7 @@ function ImportView(props: { busy: boolean; msg: string; onFiles: (f: FileList |
 function SwimmersView(props: {
   swimmers: Swimmer[];
   roster: RosterItem[];
-  addSwimmer: (name: string, team: string) => void;
+  addSwimmer: (name: string, team: string, age?: number, gender?: "Girls" | "Boys") => void;
   removeSwimmer: (id: string) => void;
   goImport: () => void;
 }) {
@@ -524,7 +647,10 @@ function SwimmersView(props: {
               <div className="kid-row" key={s.id}>
                 <span className="kid-dot" style={{ background: s.color }} />
                 <span className="kid-name">
-                  {displayName(s.name)} {s.team && <span className="muted">· {s.team}</span>}
+                  {displayName(s.name)}{" "}
+                  <span className="muted">
+                    {[s.gender, s.age, s.team].filter(Boolean).join(" · ")}
+                  </span>
                 </span>
                 <button className="remove" onClick={() => props.removeSwimmer(s.id)}>
                   ✕
@@ -552,10 +678,15 @@ function SwimmersView(props: {
               {results.map((r, i) => {
                 const added = isAdded(r.name);
                 return (
-                  <button key={i} className="result" disabled={added} onClick={() => props.addSwimmer(r.name, r.team)}>
+                  <button
+                    key={i}
+                    className="result"
+                    disabled={added}
+                    onClick={() => props.addSwimmer(r.name, r.team, parseInt(r.age, 10) || undefined, r.gender)}
+                  >
                     <span className="result-name">{displayName(r.name)}</span>
                     <span className="result-meta">
-                      {r.team} · {r.age}
+                      {[r.gender, r.age, r.team].filter(Boolean).join(" · ")}
                     </span>
                     <span className="result-add">{added ? "✓" : "+"}</span>
                   </button>
@@ -596,6 +727,17 @@ function About() {
     <div className="card about">
       <h2>About my-swimmer</h2>
       <p>A free, ad-free meet-day companion for swim families. Import a meet's published heat sheet, see all your swimmers' events on one page, the next cut to beat, and fueling tips.</p>
+
+      <h3>How to use it</h3>
+      <ol className="howto">
+        <li><strong>Add meet</strong> → paste the meet's heat-sheet PDF link and tap <em>Open link</em> (or use the <em>Upload</em> backup). Meets often post one PDF per session — add each.</li>
+        <li><strong>Swimmers</strong> → type a name and tap your swimmer from the live results (it shows team, age &amp; gender so you pick the right one). Repeat for each child.</li>
+        <li><strong>Home</strong> → all your swimmers' events appear grouped by day, with the next SE championship cut and motivational cut for each.</li>
+        <li>Tap <strong>Cards / Arm table</strong> to switch views. The arm table is the compact lineup to copy onto an arm; use the <em>PB</em>/<em>Cut</em> column toggles to add detail.</li>
+        <li>After a race, tap <strong>“add the time they swam”</strong> on that event to log it — the cuts update instantly so you can see if they made it.</li>
+        <li><strong>Theme</strong> — use the Auto / Light / Dark button at the top right.</li>
+      </ol>
+      <p className="muted small">Age &amp; gender come from the most recent heat sheet you import, and decide which time standards apply — so import the latest sheet for the truest times.</p>
 
       <h3>Your privacy</h3>
       <p>Everything runs on your device. Your swimmers' names and meet data are stored only in this browser and are never uploaded to a server. Clearing your browser data removes them.</p>
