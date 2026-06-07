@@ -82,7 +82,10 @@ crossing — weighed against privacy and cost.
 
 Already a PWA. To reach the app stores: wrap with **Capacitor** (same codebase → iOS/Android
 shells), enabling store listings, reliable offline, and true push. Mostly packaging + assets +
-a privacy policy; the core carries over directly.
+a privacy policy; the core carries over directly. **iOS needs no Mac** — reuse the macOS-runner
+TestFlight CI + App Store Connect API key already proven in the sibling `health-rpg` repo
+(account-level secrets are reusable). Full step-by-step in [`docs/appify.md`](appify.md);
+privacy policy ready in [`docs/privacy.md`](privacy.md).
 
 ## Sustainability (stay free for families)
 
