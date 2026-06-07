@@ -10,7 +10,7 @@ A rough phasing. Order matters: prove the risky part (PDF parsing) before polish
 ## Phase 1 — Parse & show "my swimmer's day" (the core risk)
 - [x] Prototype parser: extract a swimmer's events (event #, desc, heat, lane, seed)
       — validated on 2 real meets (one LCM, one SCY). See `docs/parsing.md`.
-- [ ] Handle relays (swimmers listed as legs, different layout)
+- [x] Handle relays — parse relay members; show relays alongside individual events (🏁, team time)
 - [ ] Multi-PDF ingest: meets that split by session post several PDFs → merge to one meet
 - [ ] Upload UI for heat sheet PDF(s)
 - [ ] **Disclaimer + review/edit step** — parsing is fuzzy; always prompt user to verify
