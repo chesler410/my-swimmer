@@ -22,6 +22,7 @@ import {
 import { computeCut, CutResult } from "./cuts.ts";
 import { DEFAULT_PROXY, FEEDBACK_URL } from "./config.ts";
 import { getTheme, setTheme, Theme } from "./theme.ts";
+import { t, getLang, setLang, LANGS, Lang } from "./i18n.ts";
 import day from "./day.json";
 
 type Nav = "home" | "import" | "swimmers" | "about";
@@ -84,37 +85,37 @@ function EntryCard({
         {cut?.achieved && <span className={levelClass(cut.achieved)}>{cut.achieved}</span>}
       </div>
       <div className="ev-meta">
-        <span>{e.heat ?? "Heat TBD"}</span>
-        <span className="lane">Lane {e.lane}</span>
+        <span>{e.heat ?? t("heat_tbd")}</span>
+        <span className="lane">{t("lane", { n: e.lane })}</span>
         <span>
-          {e.relay ? "Team" : result ? "Swam" : "Seed"} <strong>{time}</strong>
+          {e.relay ? t("team_label") : result ? t("swam") : t("seed")} <strong>{time}</strong>
         </span>
       </div>
-      {e.relay && <div className="cut muted">🏁 Relay — {e.team}</div>}
+      {e.relay && <div className="cut muted">🏁 {t("relaylbl")} — {e.team}</div>}
       {/* SE championship cut shown first — it's the priority target */}
       {cut?.champ && (
         <div className="champ">
-          <span>🏆 SE Champ {cut.champ.time}</span>
+          <span>🏆 {t("sechamp")} {cut.champ.time}</span>
           {cut.champ.met ? (
-            <span className="champ-met">made it ✓</span>
+            <span className="champ-met">{t("madeit")}</span>
           ) : (
-            <span className="champ-need">need {cut.champ.needed.toFixed(2)}s</span>
+            <span className="champ-need">{t("need", { s: cut.champ.needed.toFixed(2) })}</span>
           )}
         </div>
       )}
       {cut?.nextCut ? (
         <div className="cut">
           <span>
-            Next cut → <strong>{cut.nextCut.level}</strong> {cut.nextCut.time}
+            {t("nextcut")} <strong>{cut.nextCut.level}</strong> {cut.nextCut.time}
           </span>
           <span className={"need" + (close ? " need-close" : "")}>
-            drop {cut.nextCut.needed.toFixed(2)}s{close ? " — so close! 🔥" : ""}
+            {t("drop", { s: cut.nextCut.needed.toFixed(2) })}{close ? t("soclose") : ""}
           </span>
         </div>
       ) : cut ? (
-        <div className="cut muted">Top standard reached 🏆</div>
+        <div className="cut muted">{t("topstd")}</div>
       ) : e.relay ? null : (
-        <div className="cut muted">No standard for this event</div>
+        <div className="cut muted">{t("nostd")}</div>
       )}
       {!e.relay && (
       <div className="result-entry">
@@ -123,7 +124,7 @@ function EntryCard({
             className="field result-input"
             autoFocus
             defaultValue={result || ""}
-            placeholder="Time swum, e.g. 1:38.50"
+            placeholder={t("timeph")}
             inputMode="decimal"
             onBlur={(ev) => {
               onSetResult(ev.target.value.trim());
@@ -135,7 +136,7 @@ function EntryCard({
           />
         ) : (
           <button className="inline-link" onClick={() => setEditing(true)}>
-            {result ? "✎ edit swum time" : "＋ add the time they swam"}
+            {result ? t("edittime") : t("addtime")}
           </button>
         )}
       </div>
@@ -190,7 +191,7 @@ function ArmTable({
           ))}
         </tbody>
       </table>
-      <p className="muted arm-note">Ev = event, Ht = heat, Ln = lane. FR free · BK back · BR breast · FL fly · IM.</p>
+      <p className="muted arm-note">{t("armlegend")}</p>
     </div>
   );
 }
@@ -198,13 +199,13 @@ function ArmTable({
 function Fueling() {
   return (
     <section className="card fuel">
-      <h2>💧 Fueling &amp; hydration</h2>
+      <h2>💧 {t("fuel_title")}</h2>
       <ul>
-        <li>Sip water steadily all session — don't wait until thirsty.</li>
-        <li>Light carb snack ~60–90 min before the first race (banana, toast, granola bar).</li>
-        <li>Between races more than ~45 min apart: small snack + a few sips.</li>
-        <li>Avoid heavy or new foods within ~45 min of a race.</li>
-        <li>Warm/ready ~20–30 min before each event is called.</li>
+        <li>{t("fuel_1")}</li>
+        <li>{t("fuel_2")}</li>
+        <li>{t("fuel_3")}</li>
+        <li>{t("fuel_4")}</li>
+        <li>{t("fuel_5")}</li>
       </ul>
     </section>
   );
@@ -215,17 +216,14 @@ function Disclaimer() {
   if (hidden) return null;
   return (
     <div className="disclaimer">
-      <span>
-        ⚠️ Events are auto-read from the meet's PDF. PDF reading isn't perfect —{" "}
-        <strong>always double-check against the official heat sheet.</strong>
-      </span>
+      <span>⚠️ {t("disclaimer")}</span>
       <button
         onClick={() => {
           localStorage.setItem("dismiss-disclaimer", "1");
           setHidden(true);
         }}
       >
-        Got it
+        {t("gotit")}
       </button>
     </div>
   );
@@ -246,6 +244,12 @@ export function App() {
   const [msg, setMsg] = useState("");
   const [results, setResultsState] = useState<Record<string, string>>(loadResults);
   const [theme, setThemeState] = useState<Theme>(getTheme);
+  const [lang, setLangState] = useState<Lang>(getLang);
+
+  function changeLang(l: Lang) {
+    setLang(l);
+    setLangState(l);
+  }
 
   const roster = useMemo(() => buildRoster(meets), [meets]);
 
@@ -334,14 +338,23 @@ export function App() {
       <header className="apphead">
         <div className="brandrow">
           <div className="brand">🏊 my-swimmer</div>
-          <button className="theme-btn" onClick={cycleTheme} aria-label="Theme" title={`Theme: ${theme}`}>
-            {theme === "auto" ? "🅰 Auto" : theme === "light" ? "☀ Light" : "🌙 Dark"}
-          </button>
+          <div className="head-ctrls">
+            <select className="lang-sel" value={lang} onChange={(e) => changeLang(e.target.value as Lang)} aria-label={t("lang_label")}>
+              {LANGS.map((l) => (
+                <option key={l.code} value={l.code}>
+                  🌐 {l.label}
+                </option>
+              ))}
+            </select>
+            <button className="theme-btn" onClick={cycleTheme} aria-label="Theme">
+              {theme === "auto" ? "🅰 " + t("th_auto") : theme === "light" ? "☀ " + t("th_light") : "🌙 " + t("th_dark")}
+            </button>
+          </div>
         </div>
         <nav className="tabs">
-          {(["home", "import", "swimmers", "about"] as Nav[]).map((t) => (
-            <button key={t} className={nav === t ? "on" : ""} onClick={() => setNav(t)}>
-              {t === "import" ? "Add meet" : t[0].toUpperCase() + t.slice(1)}
+          {(["home", "import", "swimmers", "about"] as Nav[]).map((tb) => (
+            <button key={tb} className={nav === tb ? "on" : ""} onClick={() => setNav(tb)}>
+              {t("nav_" + tb)}
             </button>
           ))}
         </nav>
@@ -431,10 +444,10 @@ function Home(props: any) {
   return (
     <>
       {meets.length === 0 && swimmers.length === 0 && (
-        <Empty title="Welcome 🏊" body="Add a meet's heat sheet, pick your swimmers, and see all their events — events, heats, lanes, and the next time standard to chase — on one page." cta="Add a meet" onCta={props.goImport} />
+        <Empty title={t("em_welcome_t")} body={t("em_welcome_b")} cta={t("sw_addmeet")} onCta={props.goImport} />
       )}
       {meets.length > 0 && swimmers.length === 0 && (
-        <Empty title="Pick your swimmers" body="Your meet is loaded. Now tell us which swimmers are yours — search the meet's roster." cta="Choose swimmers" onCta={props.goSwimmers} />
+        <Empty title={t("em_pick_t")} body={t("em_pick_b")} cta={t("em_choose")} onCta={props.goSwimmers} />
       )}
 
       {meets.length > 0 && swimmers.length > 0 && (
@@ -459,7 +472,7 @@ function Home(props: any) {
           )}
           {closest.length > 0 && (
             <section className="card highlight">
-              <h2>🎯 Closest to a new cut</h2>
+              <h2>🎯 {t("closest")}</h2>
               {closest.map(({ d, cut }: any, i: number) => (
                 <div className="hl-row" key={i}>
                   <span>
@@ -475,24 +488,24 @@ function Home(props: any) {
           )}
           <Fueling />
           <div className="events-head">
-            <h2 className="section-title">Meets ({meets.length})</h2>
+            <h2 className="section-title">{t("meets", { n: meets.length })}</h2>
             <div className="seg">
               <button className={view === "cards" ? "on" : ""} onClick={() => pickView("cards")}>
-                Cards
+                {t("v_cards")}
               </button>
               <button className={view === "table" ? "on" : ""} onClick={() => pickView("table")}>
-                Arm table
+                {t("v_table")}
               </button>
             </div>
           </div>
           {view === "table" && (
             <div className="colchips">
-              Columns:
+              {t("columns")}
               <button className={"chip sm" + (cols.pb ? " on" : "")} onClick={() => toggleCol("pb")}>
-                PB
+                {t("c_pb")}
               </button>
               <button className={"chip sm" + (cols.cut ? " on" : "")} onClick={() => toggleCol("cut")}>
-                Cut
+                {t("c_cut")}
               </button>
             </div>
           )}
@@ -505,7 +518,7 @@ function Home(props: any) {
                 </button>
               </div>
               {items.length === 0 ? (
-                <p className="muted meet-empty">None of your swimmers are in this meet.</p>
+                <p className="muted meet-empty">{t("em_none_meet")}</p>
               ) : (
                 bySession(items).map((sec) => (
                   <div className="session-block" key={sec.label}>
@@ -534,9 +547,9 @@ function Home(props: any) {
       <SampleBlock open={showSample} setOpen={setShowSample} />
 
       <p className="feedback-foot">
-        Got feedback?{" "}
+        {t("fb_got")}{" "}
         <a href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer">
-          💬 Tell us
+          {t("fb_tell")}
         </a>
       </p>
     </>
@@ -548,7 +561,7 @@ function SampleBlock({ open, setOpen }: { open: boolean; setOpen: (b: boolean) =
   return (
     <div className="sample">
       <button className="sample-toggle" onClick={() => setOpen(!open)}>
-        {open ? "▾" : "▸"} See a sample (demo data — not your swimmer)
+        {open ? "▾" : "▸"} {t("sample_toggle")}
       </button>
       {open && (
         <div className="sample-body">
@@ -594,20 +607,20 @@ function ImportView(props: { busy: boolean; msg: string; onFiles: (f: FileList |
   return (
     <div>
       <div className="card">
-        <h2>Add a meet</h2>
-        <p className="muted">Paste the meet's heat-sheet PDF link — no download needed.</p>
+        <h2>{t("imp_title")}</h2>
+        <p className="muted">{t("imp_tip")}</p>
         <input className="field" placeholder="https://…/heatsheet.pdf" value={url} onChange={(e) => setUrl(e.target.value)} inputMode="url" autoFocus />
         <button className="primary" disabled={props.busy || !url.trim()} onClick={() => props.onUrl(url)}>
-          {props.busy ? "Opening…" : "Open link"}
+          {props.busy ? t("imp_opening") : t("imp_open")}
         </button>
-        <p className="muted small">Tip: most meet sites have a “Heat Sheet (PDF)” link you can copy. Many meets post one per session — add each.</p>
+        <p className="muted small">{t("imp_linktip")}</p>
       </div>
 
       <div className="card">
-        <h3>Backup: upload a PDF</h3>
-        <p className="muted">If a link won't open, download the PDF and pick it here. Everything is read on your phone; nothing is uploaded.</p>
+        <h3>{t("imp_backup")}</h3>
+        <p className="muted">{t("imp_backuptip")}</p>
         <label className="secondary filelabel">
-          {props.busy ? "Reading…" : "📄 Upload PDF(s)"}
+          {props.busy ? t("imp_reading") : t("imp_upload")}
           <input type="file" accept="application/pdf" multiple disabled={props.busy} onChange={(e) => props.onFiles(e.target.files)} hidden />
         </label>
       </div>
@@ -648,8 +661,8 @@ function SwimmersView(props: {
   return (
     <div>
       <div className="card">
-        <h2>Your swimmers</h2>
-        {props.swimmers.length === 0 && <p className="muted">None yet — search a meet's roster below.</p>}
+        <h2>{t("sw_your")}</h2>
+        {props.swimmers.length === 0 && <p className="muted">{t("sw_none")}</p>}
         {[...byTeam.keys()].sort().map((team) => (
           <div key={team}>
             {byTeam.size > 1 && <div className="team-head">{team}</div>}
@@ -672,18 +685,18 @@ function SwimmersView(props: {
       </div>
 
       <div className="card">
-        <h2>Find a swimmer</h2>
+        <h2>{t("sw_find")}</h2>
         {props.roster.length === 0 ? (
           <>
-            <p className="muted">Import a meet first, then search its roster here to pick your swimmers.</p>
+            <p className="muted">{t("sw_importfirst")}</p>
             <button className="primary" onClick={props.goImport}>
-              Add a meet
+              {t("sw_addmeet")}
             </button>
           </>
         ) : (
           <>
-            <input className="field" placeholder="Type a name or team…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-            {ql && results.length === 0 && <p className="muted">No swimmer matching “{q}” in your imported meets.</p>}
+            <input className="field" placeholder={t("sw_search")} value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+            {ql && results.length === 0 && <p className="muted">{t("sw_nomatch", { q })}</p>}
             <div className="results">
               {results.map((r, i) => {
                 const added = isAdded(r.name);
@@ -706,12 +719,12 @@ function SwimmersView(props: {
           </>
         )}
         <button className="inline-link manual-toggle" onClick={() => setManual(!manual)}>
-          {manual ? "– cancel manual add" : "+ add by name manually"}
+          {manual ? t("sw_manualcancel") : t("sw_manual")}
         </button>
         {manual && (
           <div className="manual">
-            <input className="field" placeholder="Swimmer name" value={mName} onChange={(e) => setMName(e.target.value)} />
-            <input className="field" placeholder="Team (optional)" value={mTeam} onChange={(e) => setMTeam(e.target.value)} />
+            <input className="field" placeholder={t("sw_nameph")} value={mName} onChange={(e) => setMName(e.target.value)} />
+            <input className="field" placeholder={t("sw_teamph")} value={mTeam} onChange={(e) => setMTeam(e.target.value)} />
             <button
               className="primary"
               onClick={() => {
@@ -721,7 +734,7 @@ function SwimmersView(props: {
                 setManual(false);
               }}
             >
-              Add swimmer
+              {t("sw_add")}
             </button>
           </div>
         )}
@@ -731,53 +744,32 @@ function SwimmersView(props: {
 }
 
 function About() {
-  const [proxy, setProxy] = useState(loadProxy);
-  const [adv, setAdv] = useState(false);
   return (
     <div className="card about">
-      <h2>About my-swimmer</h2>
-      <p>A free, ad-free meet-day companion for swim families. Import a meet's published heat sheet, see all your swimmers' events on one page, the next cut to beat, and fueling tips.</p>
+      <h2>{t("ab_title")}</h2>
+      <p>{t("ab_intro")}</p>
 
       <a className="primary feedback-btn" href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer">
-        💬 Send feedback
+        {t("fb_send")}
       </a>
 
-      <h3>How to use it</h3>
+      <h3>{t("ab_howto")}</h3>
       <ol className="howto">
-        <li><strong>Add meet</strong> → paste the meet's heat-sheet PDF link and tap <em>Open link</em> (or use the <em>Upload</em> backup). Meets often post one PDF per session — add each.</li>
-        <li><strong>Swimmers</strong> → type a name and tap your swimmer from the live results (it shows team, age &amp; gender so you pick the right one). Repeat for each child.</li>
-        <li><strong>Home</strong> → all your swimmers' events appear grouped by day, with the next SE championship cut and motivational cut for each.</li>
-        <li>Tap <strong>Cards / Arm table</strong> to switch views. The arm table is the compact lineup to copy onto an arm; use the <em>PB</em>/<em>Cut</em> column toggles to add detail.</li>
-        <li>After a race, tap <strong>“add the time they swam”</strong> on that event to log it — the cuts update instantly so you can see if they made it.</li>
-        <li><strong>Theme</strong> — use the Auto / Light / Dark button at the top right.</li>
+        <li>{t("ab_step1")}</li>
+        <li>{t("ab_step2")}</li>
+        <li>{t("ab_step3")}</li>
+        <li>{t("ab_step4")}</li>
       </ol>
-      <p className="muted small">Age &amp; gender come from the most recent heat sheet you import, and decide which time standards apply — so import the latest sheet for the truest times.</p>
 
-      <h3>Your privacy</h3>
-      <p>Everything runs on your device. Your swimmers' names and meet data are stored only in this browser and are never uploaded to a server. Clearing your browser data removes them.</p>
+      <h3>{t("ab_privacy_h")}</h3>
+      <p>{t("ab_privacy_b")}</p>
 
-      <h3>Please double-check</h3>
-      <p>Events are auto-read from PDF heat sheets, which isn't perfect. Always verify event, heat, and lane against the official posted heat sheet before a race.</p>
+      <h3>{t("ab_check_h")}</h3>
+      <p>{t("ab_check_b")}</p>
 
-      <h3>Not affiliated</h3>
-      <p className="muted">Not affiliated with or endorsed by USA Swimming, Meet Mobile, or any meet host. It simply reads heat sheets you provide. Time standards are USA Swimming 2024–2028 motivational standards plus Southeastern championship cuts.</p>
-      <p className="muted">Made by a swim parent. Feedback welcome.</p>
-
-      <button className="inline-link" onClick={() => setAdv(!adv)} style={{ marginTop: 12 }}>
-        {adv ? "– hide advanced" : "Advanced"}
-      </button>
-      {adv && (
-        <div className="manual">
-          <p className="muted small">
-            Custom fetch helper for “paste a link” (optional; only if you self-host one). Use{" "}
-            <code>{"{url}"}</code> for the link.
-          </p>
-          <input className="field" placeholder="https://you.workers.dev/?url={url}" value={proxy} onChange={(e) => setProxy(e.target.value)} />
-          <button className="primary" onClick={() => saveProxy(proxy)}>
-            Save
-          </button>
-        </div>
-      )}
+      <h3>{t("ab_aff_h")}</h3>
+      <p className="muted">{t("ab_aff_b")}</p>
+      <p className="muted small">{t("ab_lang_note")}</p>
     </div>
   );
 }

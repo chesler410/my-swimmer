@@ -435,3 +435,18 @@ footer { margin-top: 20px; text-align: center; }
 .feedback-btn { text-decoration: none; margin-bottom: 6px; }
 .feedback-foot { text-align: center; margin: 22px 0 0; font-size: 0.85rem; color: var(--muted); }
 .feedback-foot a { color: var(--blue); font-weight: 600; text-decoration: none; }
+
+/* ---- header controls (language + theme) ---- */
+.head-ctrls { display: flex; align-items: center; gap: 6px; }
+.lang-sel {
+  border: 1px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 6px;
+  border-radius: 8px;
+  max-width: 110px;
+}
+.lang-sel option { color: #0f2233; }
