@@ -359,6 +359,7 @@ function downloadIcs(text: string) {
 
 function Fueling() {
   const today = new Date().toISOString().slice(0, 10);
+  const [open, setOpen] = useState(false);
   const [date, setDate] = useState(() => localStorage.getItem("meetDate") || today);
   const [time, setTime] = useState(() => localStorage.getItem("firstRaceTime") || "");
   const start = parseHM(time);
@@ -366,7 +367,11 @@ function Fueling() {
   const after = (off: number) => (start != null ? t("fuel_after", { t: fmtClock(start + off) }) : "");
   return (
     <section className="card fuel">
-      <h2>💧 {t("fuel_title")}</h2>
+      <button className="prep-toggle" onClick={() => setOpen(!open)}>
+        {open ? "▾" : "▸"} 💧 {t("fuel_title")}
+      </button>
+      {open && (
+      <>
       <div className="fuel-inputs">
         <label className="fuel-time">
           {t("fuel_date")}{" "}
@@ -411,6 +416,8 @@ function Fueling() {
         <li>{t("btw_session")}</li>
       </ul>
       <p className="muted small">{t("hydrate_note")}</p>
+      </>
+      )}
     </section>
   );
 }
