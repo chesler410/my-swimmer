@@ -186,8 +186,11 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedPdf> {
     if (p === 1) title = findTitle(words);
     pages.push(words);
   }
-  // Results sheets have a "Finals Time" column; heat sheets don't.
-  if (pages.some((w) => w.some((x) => /Finals/.test(x.s)))) {
+  // Heat sheets have a "Lane" column; results don't. (Both contain the word "Finals" —
+  // heat sheets in "Heat 1 of 1 Finals" — so "Lane" is the reliable discriminator.)
+  const hasLane = pages.some((w) => w.some((x) => /^Lane\b/.test(x.s)));
+  const hasFinals = pages.some((w) => w.some((x) => /Finals/.test(x.s)));
+  if (!hasLane && hasFinals) {
     return { kind: "results", title, finishers: parseResultsPages(pages) };
   }
   const ordered: string[] = [];
