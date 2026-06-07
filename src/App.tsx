@@ -541,6 +541,12 @@ export function App() {
     setPacingState(p);
     localStorage.setItem("pacing", p);
   }
+  const [logo, setLogoState] = useState(() => localStorage.getItem("teamLogo") || "");
+  function setLogo(v: string) {
+    setLogoState(v);
+    if (v) localStorage.setItem("teamLogo", v);
+    else localStorage.removeItem("teamLogo");
+  }
 
   function changeLang(l: Lang) {
     setLang(l);
@@ -651,7 +657,9 @@ export function App() {
       <UpdateBanner />
       <header className="apphead">
         <div className="brandrow">
-          <div className="brand">🏊 my-swimmer</div>
+          <div className="brand">
+            {logo && <img className="team-logo" src={logo} alt="" />}🏊 my-swimmer
+          </div>
           <div className="head-ctrls">
             <select className="lang-sel" value={lang} onChange={(e) => changeLang(e.target.value as Lang)} aria-label={t("lang_label")}>
               {LANGS.map((l) => (
@@ -712,7 +720,7 @@ export function App() {
           goImport={() => setNav("import")}
         />
       )}
-      {nav === "about" && <About />}
+      {nav === "about" && <About logo={logo} setLogo={setLogo} />}
     </div>
   );
 }
@@ -1137,7 +1145,24 @@ function SwimmersView(props: {
   );
 }
 
-function About() {
+function processLogo(file: File, cb: (dataUrl: string) => void) {
+  const img = new Image();
+  img.onload = () => {
+    const max = 160;
+    const scale = Math.min(1, max / Math.max(img.width, img.height));
+    const w = Math.round(img.width * scale);
+    const h = Math.round(img.height * scale);
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    c.getContext("2d")?.drawImage(img, 0, 0, w, h);
+    cb(c.toDataURL("image/png"));
+    URL.revokeObjectURL(img.src);
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+function About({ logo, setLogo }: { logo: string; setLogo: (v: string) => void }) {
   return (
     <div className="card about">
       <h2>{t("ab_title")}</h2>
@@ -1146,6 +1171,29 @@ function About() {
       <a className="primary feedback-btn" href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer">
         {t("fb_send")}
       </a>
+
+      <h3>{t("logo_h")}</h3>
+      {logo && <img className="team-logo lg" src={logo} alt="team logo" />}
+      <div>
+        <label className="secondary filelabel">
+          {t("logo_add")}
+          <input
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) processLogo(f, setLogo);
+            }}
+          />
+        </label>
+        {logo && (
+          <button className="link" onClick={() => setLogo("")}>
+            {t("logo_remove")}
+          </button>
+        )}
+      </div>
+      <p className="muted small">{t("logo_note")}</p>
 
       <h3>{t("ab_howto")}</h3>
       <ol className="howto">

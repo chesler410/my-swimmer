@@ -512,3 +512,7 @@ footer { margin-top: 20px; text-align: center; }
 .arm-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table.arm { white-space: nowrap; }
 table.arm th, table.arm td { padding-right: 14px; }
+
+/* ---- team logo ---- */
+.team-logo { height: 22px; width: auto; max-width: 60px; object-fit: contain; vertical-align: middle; margin-right: 7px; border-radius: 4px; background: #fff; padding: 1px; }
+.team-logo.lg { height: 64px; max-width: 160px; display: block; margin: 6px 0 10px; padding: 4px; }
