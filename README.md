@@ -11,13 +11,20 @@ when do they eat."
 
 ## What it does
 
-- **All your swimmers on one page**, grouped by **session/date** (Friday Afternoon, …)
-- **Per event:** heat, lane, seed (best), and the **next motivational cut to beat** (+delta)
-- **🏆 Southeastern championship cut** per event — qualified ✓ or how much to drop
-- **Arm-table view** — compact `Ev · Swim · Ht · Ln` to copy onto a swimmer's arm, by date
-- **Live swimmer search** — search the meet's actual roster (with team) so you pick the right one
-- **Hydration & fueling** tips around the schedule
-- **Dark mode**, installable PWA, works offline
+- **The whole family on one page** — add multiple swimmers, grouped by **session/date**
+- **Per event:** heat, lane, seed (best), the **next motivational cut** (+delta, ≈ per length),
+  and the **🏆 Southeastern championship cut** (qualified ✓ or how much to drop)
+- **Live roster search** + **Teams** browser — pick swimmers by name or by team; **Watch list**
+  for following teammates/rivals alongside your own kids
+- **Relays** included (swimmer shown as a leg, with the team time)
+- **Goal & splits** — target splits to hit a goal or a specific cut (even or realistic pacing),
+  plus log actual splits and finish times on deck
+- **Arm-table view** — compact `Ev · Ht · Ln · Swim` (+ optional PB / Cut / Champ columns) to
+  copy onto a swimmer's arm, sectioned by date
+- **Timed fueling & hydration** — enter the first-race time for a clock-time plan, between-races
+  electrolyte guidance, and **calendar reminders (.ics)**; plus warm-up / stretching / meals
+- **8 languages** (EN/ES/ZH/PT/DE/VI/FR/RU), **light/dark theme**, **team logo**, responsive
+  desktop layout, installable
 
 ## How to use
 
@@ -60,7 +67,10 @@ Deploys to GitHub Pages on push to `main` via `.github/workflows/deploy.yml`.
 
 ## Status
 
-Live and in use. Recent: family hub (multi-swimmer), in-browser PDF import, live roster
-search, by-date sections, SE championship cuts, dark mode. Next ideas in
-[`docs/roadmap.md`](docs/roadmap.md): paste-link helper deploy, relays, fueling by session
-start times, SE cuts for 15-16/17-18.
+Live and in active use by swim families, iterating on their feedback. Offline support is
+temporarily off (the service worker is self-destroying while we stabilize rapid releases);
+an in-app **"new version — refresh"** banner covers updates meanwhile.
+
+**Where it's headed** — turning this into a shared tool for the whole swim community
+(accounts + cloud sync, shared team pages, results-PDF import for real times, a native app):
+see [`docs/roadmap.md`](docs/roadmap.md).

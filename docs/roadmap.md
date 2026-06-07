@@ -1,70 +1,75 @@
-# Roadmap
+# my-swimmer — roadmap & future plans
 
-A rough phasing. Order matters: prove the risky part (PDF parsing) before polish.
+**Vision:** make meet day calm for every swim family — and grow from a personal, on-device
+tool into a *shared* tool for the whole swim community (families, teams, and coaches),
+without losing the things that make it good today: free, fast, private, ad-free.
 
-## Phase 0 — Foundations (now)
-- [x] Project folder + repo + decision log + data-source research
-- [ ] Collect 2-3 real heat sheets + a psych sheet from different meets
-- [ ] Decide PDF parser approach from real samples
+---
 
-## Phase 1 — Parse & show "my swimmer's day" (the core risk)
-- [x] Prototype parser: extract a swimmer's events (event #, desc, heat, lane, seed)
-      — validated on 2 real meets (one LCM, one SCY). See `docs/parsing.md`.
-- [x] Handle relays — parse relay members; show relays alongside individual events (🏁, team time)
-- [ ] Multi-PDF ingest: meets that split by session post several PDFs → merge to one meet
-- [ ] Upload UI for heat sheet PDF(s)
-- [ ] **Disclaimer + review/edit step** — parsing is fuzzy; always prompt user to verify
-- [ ] Render a clean per-swimmer timeline for the day
-- [ ] Multi-swimmer merge (siblings in one timeline)
+## Where it is today (shipped)
 
-## Phase 2 — Cuts, PBs, rankings (the enrichment)
-- [x] Load official time standards (USA Swimming 2024-2028, Girls 10&U LCM)
-- [x] Per event: show PB (seed) + the *next* motivational cut to beat (delta)
-- [ ] More age groups / courses (SCY) + boys standards
-- [ ] Championship cuts (Sectionals/Futures/JNats), not just motivational
-- [ ] Next *ranking* time to beat (separate from cuts)
-- [ ] USA Swimming Data Hub for full PB history — BLOCKED: built on Sisense (JAQL,
-      auth-token gated), no clean GET. Seed-as-PB covers entered events for now.
+A local-first PWA (React/TS, in-browser pdf.js parsing, data on-device):
+- Multi-swimmer **family hub**; **Teams** browser + **Watch list**
+- Per-event **motivational cut** (+ per-length breakdown) and **Southeastern championship cut**
+- **Goal & splits** (even/realistic) + on-deck split & finish-time logging; **relays**
+- **Arm-table** view (PB/Cut/Champ columns); by-date sections; cards/table
+- **Timed fueling** + between-races electrolyte guidance + **.ics reminders**; warm-up/stretch/meals
+- **8 languages**, light/dark theme, **team logo**, responsive desktop, refresh banner
+- Bundled standards (USA Swimming 2024–2028 motivational, all ages/genders/courses; SE champ)
 
-## Phase 4.5 — Shipped milestone (2026-06-07)
-- [x] Installable PWA live at https://chesler410.github.io/my-swimmer/ (repo public)
-- [x] Renders a real meet (sample data): schedule, cuts, closest-to-cut, fueling, disclaimer
-- [x] Editable swimmer name (saved locally; repo ships generic sample data)
-- [x] "Arm table" view (user request): by-day compact table with abbreviations
-      (Ev/Swim/Ht/Ln) for writing the lineup on a swimmer's arm. Toggle vs Cards.
-- [ ] NEXT: in-browser PDF upload (pdf.js port of the parser) so any meet works
-- [ ] NEXT: swimmer picker + multi-swimmer (siblings)
-- [ ] Day/session mapping from the PDF's session schedule (arm table currently uses
-      a sample day split; real meets need the schedule parsed for accurate days + times)
+## Near-term (no backend needed)
 
-## Phase 3 — Fueling
-- [ ] Hydration/snack timing woven around the schedule
-- [ ] Configurable per swimmer
+- **Results-PDF import** — meets post *results* sheets in the same Hy-Tek format; reuse the parser
+  to pull **actual swum times** automatically → real PBs, cuts achieved, season progress.
+  *(Highest-value next; closest thing to "real-time" that's actually obtainable.)*
+- **Re-enable offline** — bring back a proper service worker (precaching) now that the
+  blank-page/cache issues are stable, keeping the refresh banner.
+- **Finish translations** — full coverage for FR/RU and the longer About/prep/fuel text; invite
+  native-speaker corrections via the feedback form.
+- **More standards** — SE winter/SCY champ doc; other LSCs' championship cuts; sectionals/futures/
+  junior-national cuts; source from official LSC pages. Sources backed up in `scripts/sources/`.
+- **Polish** — add-a-swimmer re-matches existing meets; share/print the arm chart; "up next" countdown.
 
-## Phase 4 — Pool-deck polish
-- [ ] "You're up in ~N events" countdown; "mark heat done"
-- [ ] Relay alerts (easy to miss)
-- [ ] Travel/arrival math (leave-by time)
-- [ ] Offline-first / installable PWA hardening
-- [ ] Post-meet: auto-detect new PBs + cuts achieved → shareable card
+## The "shared tool" leap (needs accounts + a backend)
 
-## Phase 5 — Family hub (the real product; user vision 2026-06-07) — SHIPPED core
-"I'm Dad A with 3 kids — consolidate all my kids' events on one simple page."
-- [x] **Kid profiles** stored on device (local-first, no backend, COPPA-safe); name-match
-- [x] **Multi-swimmer merged page** — all kids' events across meets, kid filter chips
-- [x] **Input: upload PDFs** in-browser (pdf.js port; byte-identical to PyMuPDF parser)
-- [x] **Cuts for everyone** — bundled USA Swimming 2024-2028 standards (all ages,
-      both genders, LCM+SCY) parsed by scripts/build_standards.py
-- [x] **About / privacy / disclaimer / not-affiliated** page; ad-free, no paywall
-- [x] Demo mode (?demo) + cards/arm-table per meet; each uploaded PDF = a session
-- [ ] Re-match meets when a kid is added later (currently re-import needed)
-- [ ] **Input: link a meet** — paste a gomotion/meet URL → fetch its published heat-sheet
-      PDFs. Needs a tiny serverless proxy (browser CORS blocks cross-origin PDF fetch).
-- [ ] **Input: search nearby meets → live published data** — AMBITIOUS / UNCERTAIN: no
-      clean aggregated "meets near me" API exists (same wall as Data Hub/Meet Mobile).
-      Likely needs scraping (ToS care) or USA Swimming meet search (Sisense-gated).
-- [ ] **Cross-device sync of kid details** — needs a backend + accounts (cost). Local-only
-      first; cloud sync is a separate, bigger step.
+This is the step from *personal* to *community*. It introduces a server, so it's a deliberate
+crossing — weighed against privacy and cost.
 
-## Ideas parking lot
-(Add freely — more coming from the user.)
+- **Accounts + cloud sync** — set up swimmers once, see them on both parents' phones.
+- **Shared team pages & branding** — a team's logo/colors and roster maintained centrally
+  (today's logo is per-device on purpose); coaches/managers publish a meet's lineups.
+- **Coach / team-admin view** — whole-team rosters, relay planning, heat-sheet distribution.
+- **Sharing** — send a swimmer's day or an arm chart to family; group/team links.
+- **Notifications** — "you're up in ~N events," fuel reminders as push (needs the SW + opt-in).
+
+### Guardrails for that step
+- **COPPA / minors' privacy** is the gating concern: storing children's data on a server triggers
+  real obligations (consent, privacy policy, retention). Local-first sidesteps most of it; cloud
+  must be designed for it from day one.
+- Keep a **free tier**; never sell data; ad-free.
+
+## Data & "real-time" reality
+
+- **Meet Mobile (Active Network)** live results have **no public API** (proprietary/paywalled) —
+  we can't legally/reliably link to them. The realistic substitutes: **results-PDF import**
+  (near-real-time, within hours) and **on-deck manual entry** (live).
+- **USA Swimming Data Hub** (historical times/rankings) is **Sisense-locked** — no clean API.
+  We use the heat sheet's seed time as the best-time proxy; results PDFs improve on that.
+- **Heat/psych/results PDFs** (Hy-Tek) remain the reliable, ToS-safe backbone.
+
+## Native app
+
+Already a PWA. To reach the app stores: wrap with **Capacitor** (same codebase → iOS/Android
+shells), enabling store listings, reliable offline, and true push. Mostly packaging + assets +
+a privacy policy; the core carries over directly.
+
+## Sustainability (stay free for families)
+
+- **Free + optional tip jar** to start.
+- **Club/team sponsorship** (B2B) is the cleaner revenue path than charging parents.
+- **Freemium** later (cloud sync / premium standards) — only once the free tier is loved.
+
+## Get involved
+
+Feedback drives this — in-app **💬 Send feedback** (Google Form) → triaged into GitHub issues.
+Native-speaker translation fixes and standards PDFs for other LSCs are especially welcome.
