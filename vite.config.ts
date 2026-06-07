@@ -10,6 +10,9 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: false, // we register manually (below) so the scope respects base
+      // Temporarily self-destroying: unregisters old service workers and clears their
+      // caches on every device, eliminating stale-cache blank pages. (Offline off for now.)
+      selfDestroying: true,
       includeAssets: ["favicon.svg"],
       manifest: {
         name: "my-swimmer",
