@@ -211,7 +211,7 @@ function EntryCard({
             autoFocus
             defaultValue={result || ""}
             placeholder={t("timeph")}
-            inputMode="decimal"
+            inputMode="text"
             onBlur={(ev) => {
               onSetResult(ev.target.value.trim());
               setEditing(false);
@@ -253,7 +253,7 @@ function EntryCard({
                 className="field result-input"
                 defaultValue={goal || ""}
                 placeholder={t("goal_ph")}
-                inputMode="decimal"
+                inputMode="text"
                 onBlur={(ev) => onGoal?.(ev.target.value.trim())}
                 onKeyDown={(ev) => {
                   if (ev.key === "Enter") (ev.target as HTMLInputElement).blur();
@@ -354,6 +354,15 @@ function ArmTable({
     const c = cutFor(d, results[resultKey(d.meetId, d.e.event, d.swimmer)]);
     return c?.champ ? c.champ.time : "—";
   };
+  // Highlight a row the swimmer has already qualified for, tinted by the highest cut reached
+  // (motivational ladder B→AAAA; falls back to the 🏆 SE champ cut if that's all that's met).
+  const achievedOf = (d: DE): { cls: string; label: string } | null => {
+    const c = cutFor(d, results[resultKey(d.meetId, d.e.event, d.swimmer)]);
+    if (!c) return null;
+    if (c.achieved) return { cls: "lvl-" + c.achieved.toLowerCase(), label: c.achieved };
+    if (c.champ?.met) return { cls: "arm-champ", label: "🏆" };
+    return null;
+  };
   return (
     <div className="card">
       <div className="arm-wrap">
@@ -371,22 +380,28 @@ function ArmTable({
           </tr>
         </thead>
         <tbody>
-          {sorted.map((d, i) => (
-            <tr key={i}>
-              {multi && <td style={{ color: d.color, fontWeight: 600 }}>{firstName(d.swimmer)}</td>}
-              <td className="mono">{d.e.event}</td>
-              <td className="mono">{heatNum(d.e.heat)}</td>
-              <td className="mono">{d.e.lane}</td>
-              <td>{swimAbbr(raceOf(d.e))}</td>
-              {cols.pb && <td className="mono">{pbOf(d)}</td>}
-              {cols.cut && <td className="mono">{cutOf(d)}</td>}
-              {cols.champ && <td className="mono">{champOf(d)}</td>}
-            </tr>
-          ))}
+          {sorted.map((d, i) => {
+            const ach = achievedOf(d);
+            return (
+              <tr key={i} className={ach ? "arm-ach " + ach.cls : ""}>
+                {multi && <td style={{ color: d.color, fontWeight: 600 }}>{firstName(d.swimmer)}</td>}
+                <td className="mono">{d.e.event}</td>
+                <td className="mono">{heatNum(d.e.heat)}</td>
+                <td className="mono">{d.e.lane}</td>
+                <td>
+                  {swimAbbr(raceOf(d.e))}
+                  {ach && <span className="arm-tick" title={t("arm_qualified", { lvl: ach.label })}>✓ {ach.label}</span>}
+                </td>
+                {cols.pb && <td className="mono">{pbOf(d)}</td>}
+                {cols.cut && <td className="mono">{cutOf(d)}</td>}
+                {cols.champ && <td className="mono">{champOf(d)}</td>}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       </div>
-      <p className="muted arm-note">{t("armlegend")}</p>
+      <p className="muted arm-note">{t("armlegend")} {t("arm_achnote")}</p>
     </div>
   );
 }
@@ -1795,6 +1810,9 @@ function About({ logo, setLogo, setBrand, role, onChangeRole }: { logo: string; 
         <li>{t("ab_step3")}</li>
         <li>{t("ab_step4")}</li>
       </ol>
+
+      <h3>{t("ab_auto_h")}</h3>
+      <p>{t("ab_auto_b")}</p>
 
       <h3>{t("ab_privacy_h")}</h3>
       <p>{t("ab_privacy_b")}</p>

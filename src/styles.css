@@ -158,6 +158,23 @@ table.arm td {
 }
 table.arm tr:last-child td { border-bottom: none; }
 table.arm td:nth-child(2) { font-weight: 600; }
+/* Achieved-cut row highlight, tinted by the highest level reached. */
+tr.arm-ach td { background: #eaf6ee; }
+tr.arm-ach.lvl-b td { background: #eef1f4; }
+tr.arm-ach.lvl-bb td { background: #e7eef6; }
+tr.arm-ach.lvl-a td { background: #e4eefb; }
+tr.arm-ach.lvl-aa td { background: #dde8f8; }
+tr.arm-ach.lvl-aaa td { background: #efe8fb; }
+tr.arm-ach.lvl-aaaa td, tr.arm-ach.arm-champ td { background: #fdf3d4; }
+tr.arm-ach td:first-child { box-shadow: inset 4px 0 0 var(--made, #1f9d57); }
+tr.arm-ach.lvl-aaa td:first-child { box-shadow: inset 4px 0 0 #7d4bd0; }
+tr.arm-ach.lvl-aaaa td:first-child, tr.arm-ach.arm-champ td:first-child { box-shadow: inset 4px 0 0 var(--gold); }
+.arm-tick { display: inline-block; margin-left: 6px; font-size: 0.72rem; font-weight: 800; color: #1f7a44; }
+.theme-dark tr.arm-ach td { background: #14271c; }
+.theme-dark tr.arm-ach.lvl-a td, .theme-dark tr.arm-ach.lvl-aa td { background: #14233a; }
+.theme-dark tr.arm-ach.lvl-aaa td { background: #211a33; }
+.theme-dark tr.arm-ach.lvl-aaaa td, .theme-dark tr.arm-ach.arm-champ td { background: #2e2710; }
+.theme-dark .arm-tick { color: #6fe0a0; }
 .mono {
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
