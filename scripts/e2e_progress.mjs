@@ -59,6 +59,7 @@ try {
   // Pre-seed Amy (mine) + an earlier meet where she swam 100 Free slower (1:12.00).
   await page.goto(base);
   await page.evaluate(() => {
+    localStorage.setItem("role", "parent");
     localStorage.setItem("swimmers", JSON.stringify([
       { id: "s1", name: "Doe, Amy", team: "PASA", age: 10, gender: "Girls", color: "#0b3d91" },
     ]));

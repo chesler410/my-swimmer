@@ -14,6 +14,8 @@ A local-first PWA (React/TS, in-browser pdf.js parsing, data on-device):
 - **Goal & splits** (even/realistic) + on-deck split & finish-time logging; **relays**
 - **Arm-table** view (PB/Cut/Champ columns); by-date sections; cards/table
 - **Per-event private notes**; **per-swimmer Progress** (best time per event across all meets + improvement)
+- **Parent / Coach mode** (on-device): first-run role prompt; a coach picks a team and their home
+  screen shows every swimmer on it (the multi-device/cloud version is the backend step below)
 - **Imports**: Hy-Tek heat/psych **PDFs**, **results PDFs** (overlay actual times), and **SD3 (SDIF)** files
 - **Timed fueling** + between-races electrolyte guidance + **.ics reminders**; warm-up/stretch/meals
 - **8 languages**, light/dark theme, **team logo** (auto-derives a brand color), responsive desktop, refresh banner
@@ -40,7 +42,9 @@ crossing — weighed against privacy and cost.
 - **Accounts + cloud sync** — set up swimmers once, see them on both parents' phones.
 - **Shared team pages & branding** — a team's logo/colors and roster maintained centrally
   (today's logo is per-device on purpose); coaches/managers publish a meet's lineups.
-- **Coach / team-admin view** — whole-team rosters, relay planning, heat-sheet distribution.
+- **Coach / team-admin view (cloud)** — the on-device coach mode already shows a chosen team's
+  whole roster; the cloud step adds central roster ownership, relay planning, and heat-sheet
+  distribution across coaches/devices.
 - **Sharing** — send a swimmer's day or an arm chart to family; group/team links.
 - **Notifications** — "you're up in ~N events," fuel reminders as push (needs the SW + opt-in).
 

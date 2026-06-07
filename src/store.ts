@@ -71,6 +71,22 @@ export function makeSwimmer(name: string, team: string, index: number, age?: num
   return { id: uid(), name: name.trim(), team: team.trim() || undefined, age, gender, color: COLORS[index % COLORS.length], watch };
 }
 
+// Coach mode: turn a team's full roster into swimmer objects for the home/progress views.
+// Ids are deterministic (so filter chips stay stable) and these are NOT persisted as the
+// user's own swimmers — they're derived live from imported meets for the chosen team.
+export function teamSwimmers(meets: Meet[], team: string): Swimmer[] {
+  return buildRoster(meets)
+    .filter((r) => (r.team || "") === team)
+    .map((r, i) => ({
+      id: "coach:" + r.name + "|" + r.team,
+      name: r.name,
+      team: r.team,
+      age: parseInt(r.age, 10) || undefined,
+      gender: r.gender,
+      color: COLORS[i % COLORS.length],
+    }));
+}
+
 // Roster grouped by team, for the Team browse view.
 export function buildTeams(meets: Meet[]): { team: string; swimmers: RosterItem[] }[] {
   const map = new Map<string, RosterItem[]>();

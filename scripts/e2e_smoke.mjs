@@ -45,6 +45,7 @@ try {
         { event: 2, race: "50 Free", desc: "Boys 11-12 50 Yard Freestyle", heat: "Heat 1 of 1 Finals", lane: 3, name: "Roe, Ben", age: "12", team: "XYZ", seed: "30.00", session: null },
       ],
     };
+    localStorage.setItem("role", "parent");
     localStorage.setItem("meets", JSON.stringify([meet]));
     localStorage.setItem("swimmers", JSON.stringify([
       { id: "s1", name: "Doe, Amy", team: "ABC", age: 10, gender: "Girls", color: "#0b3d91" },

@@ -17,6 +17,7 @@ import {
   matchesName,
   buildRoster,
   buildTeams,
+  teamSwimmers,
   importFile,
   importUrl,
   applyResults,
@@ -31,6 +32,7 @@ import { t, getLang, setLang, LANGS, Lang } from "./i18n.ts";
 import day from "./day.json";
 
 type Nav = "home" | "import" | "swimmers" | "watching" | "progress" | "teams" | "about";
+type Role = "parent" | "coach";
 
 function displayName(n: string): string {
   if (n.includes(",")) {
@@ -567,6 +569,18 @@ export function App() {
   });
   const [swimmers, setSwimmers] = useState<Swimmer[]>(loadSwimmers);
   const [meets, setMeets] = useState<Meet[]>(loadMeets);
+  const [role, setRoleState] = useState<Role | null>(() => (localStorage.getItem("role") as Role) || null);
+  const [coachTeam, setCoachTeamState] = useState<string>(() => localStorage.getItem("coachTeam") || "");
+  function setRole(r: Role | null) {
+    setRoleState(r);
+    if (r) localStorage.setItem("role", r);
+    else localStorage.removeItem("role");
+  }
+  function setCoachTeam(team: string) {
+    setCoachTeamState(team);
+    if (team) localStorage.setItem("coachTeam", team);
+    else localStorage.removeItem("coachTeam");
+  }
   const [view, setView] = useState<"cards" | "table">(
     () => (localStorage.getItem("view") as "cards" | "table") || "cards"
   );
@@ -615,6 +629,15 @@ export function App() {
   }
 
   const roster = useMemo(() => buildRoster(meets), [meets]);
+  // In coach mode the active list is the whole chosen team's roster (derived live);
+  // parents use their own saved swimmers.
+  const coaching = role === "coach" && !!coachTeam;
+  // Show the normal tabbed app only once a role is chosen (and a coach has picked a team).
+  const gated = role !== null && !(role === "coach" && !coachTeam);
+  const activeSwimmers = useMemo(
+    () => (coaching ? teamSwimmers(meets, coachTeam) : swimmers),
+    [coaching, coachTeam, meets, swimmers]
+  );
 
   function setResult(meetId: string, event: number, name: string, val: string) {
     const next = { ...results };
@@ -731,8 +754,8 @@ export function App() {
       );
     }
     if (!outcomes.length && err) parts.push(err);
-    if ((newMeets.length || resultSets.length) && swimmers.length) setNav("home");
-    else if (newMeets.length && !swimmers.length) setNav("swimmers");
+    if ((newMeets.length || resultSets.length) && (swimmers.length || coaching)) setNav("home");
+    else if (newMeets.length && !swimmers.length && !coaching) setNav("swimmers");
     setMsg(parts.join(" ").trim());
     setBusy(false);
   }
@@ -758,18 +781,40 @@ export function App() {
             </button>
           </div>
         </div>
-        <nav className="tabs">
-          {(["home", "import", "swimmers", "watching", "progress", "teams", "about"] as Nav[]).map((tb) => (
-            <button key={tb} className={nav === tb ? "on" : ""} onClick={() => setNav(tb)}>
-              {t("nav_" + tb)}
-            </button>
-          ))}
-        </nav>
+        {role && !(role === "coach" && !coachTeam) && (
+          <nav className="tabs">
+            {((coaching
+              ? ["home", "import", "progress", "teams", "about"]
+              : ["home", "import", "swimmers", "watching", "progress", "teams", "about"]) as Nav[]).map((tb) => (
+              <button key={tb} className={nav === tb ? "on" : ""} onClick={() => setNav(tb)}>
+                {t("nav_" + tb)}
+              </button>
+            ))}
+          </nav>
+        )}
+        {coaching && (
+          <div className="coachbar">
+            <span>🧑‍🏫 {t("role_coach")} · <strong>{coachTeam}</strong></span>
+            <button className="coach-switch" onClick={() => { setCoachTeam(""); }}>{t("coach_switch")}</button>
+          </div>
+        )}
       </header>
 
-      {nav === "home" && (
+      {role === null && (
+        <RolePicker onPick={(r) => { setRole(r); if (r === "parent") setCoachTeam(""); }} />
+      )}
+      {role === "coach" && !coachTeam && (
+        <CoachTeamPicker
+          teams={buildTeams(meets)}
+          onPick={setCoachTeam}
+          goImport={() => setNav("import")}
+          onBack={() => setRole(null)}
+        />
+      )}
+
+      {gated && nav === "home" && (
         <Home
-          swimmers={swimmers}
+          swimmers={activeSwimmers}
           meets={meets}
           view={view}
           pickView={pickView}
@@ -788,8 +833,8 @@ export function App() {
           setPacing={setPacing}
         />
       )}
-      {nav === "import" && <ImportView busy={busy} msg={msg} onFiles={onFiles} onUrl={onUrl} goAbout={() => setNav("about")} />}
-      {(nav === "swimmers" || nav === "watching") && (
+      {gated && nav === "import" && <ImportView busy={busy} msg={msg} onFiles={onFiles} onUrl={onUrl} goAbout={() => setNav("about")} />}
+      {gated && !coaching && (nav === "swimmers" || nav === "watching") && (
         <SwimmersView
           swimmers={swimmers}
           roster={roster}
@@ -799,14 +844,14 @@ export function App() {
           mode={nav === "watching" ? "watch" : "mine"}
         />
       )}
-      {nav === "progress" && (
+      {gated && nav === "progress" && (
         <ProgressView
-          progress={buildProgress(swimmers, meets, results)}
+          progress={buildProgress(activeSwimmers, meets, results)}
           goImport={() => setNav("import")}
-          goSwimmers={() => setNav("swimmers")}
+          goSwimmers={() => setNav(coaching ? "import" : "swimmers")}
         />
       )}
-      {nav === "teams" && (
+      {gated && nav === "teams" && (
         <TeamsView
           teams={buildTeams(meets)}
           swimmers={swimmers}
@@ -814,7 +859,7 @@ export function App() {
           goImport={() => setNav("import")}
         />
       )}
-      {nav === "about" && <About logo={logo} setLogo={setLogo} setBrand={setBrand} />}
+      {gated && nav === "about" && <About logo={logo} setLogo={setLogo} setBrand={setBrand} role={role} onChangeRole={() => setRole(null)} />}
     </div>
   );
 }
@@ -1108,6 +1153,58 @@ function Empty(props: { title: string; body: string; cta: string; onCta: () => v
   );
 }
 
+function RolePicker(props: { onPick: (r: Role) => void }) {
+  return (
+    <div className="card rolepick">
+      <h2>{t("role_q")}</h2>
+      <p className="muted">{t("role_sub")}</p>
+      <div className="role-opts">
+        <button className="role-opt" onClick={() => props.onPick("parent")}>
+          <span className="role-emoji">👪</span>
+          <span className="role-name">{t("role_parent")}</span>
+          <span className="role-desc">{t("role_parent_d")}</span>
+        </button>
+        <button className="role-opt" onClick={() => props.onPick("coach")}>
+          <span className="role-emoji">🧑‍🏫</span>
+          <span className="role-name">{t("role_coach")}</span>
+          <span className="role-desc">{t("role_coach_d")}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CoachTeamPicker(props: {
+  teams: { team: string; swimmers: RosterItem[] }[];
+  onPick: (team: string) => void;
+  goImport: () => void;
+  onBack: () => void;
+}) {
+  return (
+    <div className="card">
+      <button className="inline-link" onClick={props.onBack}>← {t("role_back")}</button>
+      <h2>{t("coach_pick_t")}</h2>
+      <p className="muted">{t("coach_pick_b")}</p>
+      {props.teams.length === 0 ? (
+        <>
+          <p className="muted">{t("coach_none")}</p>
+          <button className="primary" onClick={props.goImport}>{t("sw_addmeet")}</button>
+        </>
+      ) : (
+        <div className="team-list">
+          {props.teams.map(({ team, swimmers }) => (
+            <button className="result" key={team} onClick={() => props.onPick(team)}>
+              <span className="result-name">{team}</span>
+              <span className="result-meta">{t("nswim", { n: swimmers.length })}</span>
+              <span className="result-add">→</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProgressView(props: { progress: SwimmerProgress[]; goImport: () => void; goSwimmers: () => void }) {
   if (!props.progress.length)
     return <Empty title={t("prog_empty_t")} body={t("prog_empty_b")} cta={t("prog_empty_cta")} onCta={props.goSwimmers} />;
@@ -1338,11 +1435,16 @@ function processLogo(file: File, cb: (dataUrl: string, color: string | null) => 
   img.src = URL.createObjectURL(file);
 }
 
-function About({ logo, setLogo, setBrand }: { logo: string; setLogo: (v: string) => void; setBrand: (v: string) => void }) {
+function About({ logo, setLogo, setBrand, role, onChangeRole }: { logo: string; setLogo: (v: string) => void; setBrand: (v: string) => void; role: Role | null; onChangeRole: () => void }) {
   return (
     <div className="card about">
       <h2>{t("ab_title")}</h2>
       <p>{t("ab_intro")}</p>
+
+      <div className="role-line">
+        <span className="muted">{role === "coach" ? "🧑‍🏫 " + t("role_coach") : "👪 " + t("role_parent")}</span>
+        <button className="inline-link" onClick={onChangeRole}>{t("role_change")}</button>
+      </div>
 
       <a className="primary feedback-btn" href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer">
         {t("fb_send")}

@@ -476,6 +476,23 @@ footer { margin-top: 20px; text-align: center; }
 .note-actions .cancel { background: var(--bg); color: var(--muted); }
 .theme-dark .note-actions .cancel { background: #26313f; }
 
+/* ---- role picker + coach mode ---- */
+.rolepick { text-align: center; }
+.role-opts { display: flex; gap: 12px; margin-top: 14px; }
+.role-opt { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; background: var(--bg); border: 2px solid #dbe4ee; border-radius: 14px; padding: 18px 12px; cursor: pointer; font: inherit; color: var(--ink); transition: border-color .15s, transform .05s; }
+.role-opt:hover { border-color: var(--blue); }
+.role-opt:active { transform: scale(0.98); }
+.theme-dark .role-opt { background: #14202c; border-color: #2a3744; }
+.role-emoji { font-size: 1.9rem; }
+.role-name { font-weight: 800; font-size: 1.05rem; }
+.role-desc { font-size: 0.8rem; color: var(--muted); line-height: 1.35; }
+.team-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.coachbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: 0.82rem; color: #eaf2ff; background: rgba(255,255,255,0.12); padding: 6px 10px; border-radius: 9px; }
+.coachbar strong { font-weight: 800; }
+.coach-switch { border: none; background: rgba(255,255,255,0.85); color: var(--blue); font: inherit; font-size: 0.78rem; font-weight: 700; padding: 4px 12px; border-radius: 8px; cursor: pointer; }
+.role-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--bg); border-radius: 10px; padding: 8px 12px; margin: 6px 0 4px; }
+.theme-dark .role-line { background: #14202c; }
+
 /* ---- progress view ---- */
 .prog-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .progtable { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
