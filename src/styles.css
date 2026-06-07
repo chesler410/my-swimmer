@@ -223,7 +223,7 @@ footer { margin-top: 20px; text-align: center; }
   position: sticky;
   top: 0;
   z-index: 10;
-  background: linear-gradient(160deg, var(--blue), var(--navy));
+  background: linear-gradient(160deg, var(--brand, var(--blue)), var(--brand2, var(--navy)));
   color: #fff;
   margin: 0 -14px 14px;
   padding: calc(env(safe-area-inset-top) + 12px) 14px 10px;
@@ -460,6 +460,21 @@ footer { margin-top: 20px; text-align: center; }
 .splittable td { padding: 3px 16px 3px 0; border-top: 1px solid #eef2f6; }
 .theme-dark .splittable td { border-color: #202b36; }
 .splittable .actual { color: var(--close); font-weight: 600; }
+
+/* ---- per-event notes ---- */
+.note-sec { margin-top: 6px; }
+.note-shown { display: flex; gap: 8px; align-items: flex-start; background: #fff8e6; border: 1px solid #f0e2b8; border-radius: 10px; padding: 8px 10px; font-size: 0.86rem; line-height: 1.4; white-space: pre-wrap; }
+.theme-dark .note-shown { background: #2a2410; border-color: #4a4020; color: #f0e6c8; }
+.note-shown .note-text { flex: 1; }
+.note-shown button { border: none; background: none; color: var(--blue); font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; padding: 0; white-space: nowrap; }
+.note-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 0.88rem; padding: 8px 10px; border: 1.5px solid #d3dde7; border-radius: 10px; resize: vertical; min-height: 56px; }
+.theme-dark .note-input { background: #0f1822; border-color: #2a3744; color: var(--ink); }
+.note-add { border: none; background: none; color: var(--blue); font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; padding: 2px 0; }
+.note-actions { display: flex; gap: 8px; margin-top: 6px; }
+.note-actions button { border: none; border-radius: 8px; font: inherit; font-size: 0.82rem; font-weight: 600; padding: 5px 12px; cursor: pointer; }
+.note-actions .save { background: var(--blue); color: #fff; }
+.note-actions .cancel { background: var(--bg); color: var(--muted); }
+.theme-dark .note-actions .cancel { background: #26313f; }
 
 /* ---- teams view ---- */
 .teams-intro { margin: 0 4px 12px; }

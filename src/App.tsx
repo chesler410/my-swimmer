@@ -28,7 +28,7 @@ import { getTheme, setTheme, Theme } from "./theme.ts";
 import { t, getLang, setLang, LANGS, Lang } from "./i18n.ts";
 import day from "./day.json";
 
-type Nav = "home" | "import" | "swimmers" | "teams" | "about";
+type Nav = "home" | "import" | "swimmers" | "watching" | "teams" | "about";
 
 function displayName(n: string): string {
   if (n.includes(",")) {
@@ -77,6 +77,8 @@ function EntryCard({
   onSplits,
   pacing,
   setPacing,
+  note,
+  onNote,
 }: {
   d: DE;
   showSwimmer: boolean;
@@ -88,10 +90,13 @@ function EntryCard({
   onSplits?: (val: string) => void;
   pacing?: "even" | "realistic";
   setPacing?: (p: "even" | "realistic") => void;
+  note?: string;
+  onNote?: (val: string) => void;
 }) {
   const { e } = d;
   const [editing, setEditing] = useState(false);
   const [showSplits, setShowSplits] = useState(false);
+  const [editNote, setEditNote] = useState(false);
   const splits = e.relay ? null : goalSplits(e.desc, goal || "", pacing || "even");
   const actualArr = (asplits || "").split(",").map((x) => x.trim()).filter(Boolean);
   const seg = e.relay ? null : segInfo(e.desc);
@@ -247,6 +252,31 @@ function EntryCard({
                 }}
               />
             </div>
+          )}
+        </div>
+      )}
+      {!e.relay && (
+        <div className="note-sec">
+          {editNote ? (
+            <textarea
+              className="field note-input"
+              autoFocus
+              defaultValue={note || ""}
+              placeholder={t("note_ph")}
+              rows={2}
+              onBlur={(ev) => {
+                onNote?.(ev.target.value.trim());
+                setEditNote(false);
+              }}
+            />
+          ) : note ? (
+            <div className="note-shown" onClick={() => setEditNote(true)}>
+              📝 {note} <span className="muted">{t("note_edit")}</span>
+            </div>
+          ) : (
+            <button className="inline-link" onClick={() => setEditNote(true)}>
+              {t("note_add")}
+            </button>
           )}
         </div>
       )}
@@ -510,6 +540,16 @@ function UpdateBanner() {
   );
 }
 
+function darken(hex: string, f: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return (
+    "#" +
+    [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+      .map((v) => Math.round(v * f).toString(16).padStart(2, "0"))
+      .join("")
+  );
+}
+
 function loadMap(key: string): Record<string, string> {
   try {
     return JSON.parse(localStorage.getItem(key) || "{}");
@@ -521,7 +561,7 @@ function loadMap(key: string): Record<string, string> {
 export function App() {
   const [nav, setNav] = useState<Nav>(() => {
     const t = new URLSearchParams(location.search).get("tab");
-    return (["home", "import", "swimmers", "teams", "about"].includes(t || "") ? t : "home") as Nav;
+    return (["home", "import", "swimmers", "watching", "teams", "about"].includes(t || "") ? t : "home") as Nav;
   });
   const [swimmers, setSwimmers] = useState<Swimmer[]>(loadSwimmers);
   const [meets, setMeets] = useState<Meet[]>(loadMeets);
@@ -532,6 +572,7 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [results, setResultsState] = useState<Record<string, string>>(loadResults);
+  const [notes, setNotesState] = useState<Record<string, string>>(() => loadMap("notes"));
   const [goals, setGoalsState] = useState<Record<string, string>>(() => loadMap("goals"));
   const [asplits, setAsplitsState] = useState<Record<string, string>>(() => loadMap("actualsplits"));
   const [theme, setThemeState] = useState<Theme>(getTheme);
@@ -549,6 +590,22 @@ export function App() {
     if (v) localStorage.setItem("teamLogo", v);
     else localStorage.removeItem("teamLogo");
   }
+  const [brand, setBrandState] = useState(() => localStorage.getItem("brandColor") || "");
+  function setBrand(v: string) {
+    setBrandState(v);
+    if (v) localStorage.setItem("brandColor", v);
+    else localStorage.removeItem("brandColor");
+  }
+  useEffect(() => {
+    const el = document.documentElement;
+    if (brand) {
+      el.style.setProperty("--brand", brand);
+      el.style.setProperty("--brand2", darken(brand, 0.6));
+    } else {
+      el.style.removeProperty("--brand");
+      el.style.removeProperty("--brand2");
+    }
+  }, [brand]);
 
   function changeLang(l: Lang) {
     setLang(l);
@@ -566,15 +623,15 @@ export function App() {
     saveResults(next);
   }
   function setMap(
-    kind: "goal" | "splits",
+    kind: "goal" | "splits" | "note",
     meetId: string,
     event: number,
     name: string,
     val: string
   ) {
-    const map = kind === "goal" ? goals : asplits;
-    const setter = kind === "goal" ? setGoalsState : setAsplitsState;
-    const storeKey = kind === "goal" ? "goals" : "actualsplits";
+    const map = kind === "goal" ? goals : kind === "splits" ? asplits : notes;
+    const setter = kind === "goal" ? setGoalsState : kind === "splits" ? setAsplitsState : setNotesState;
+    const storeKey = kind === "goal" ? "goals" : kind === "splits" ? "actualsplits" : "notes";
     const next = { ...map };
     const k = resultKey(meetId, event, name);
     if (val.trim()) next[k] = val.trim();
@@ -700,7 +757,7 @@ export function App() {
           </div>
         </div>
         <nav className="tabs">
-          {(["home", "import", "swimmers", "teams", "about"] as Nav[]).map((tb) => (
+          {(["home", "import", "swimmers", "watching", "teams", "about"] as Nav[]).map((tb) => (
             <button key={tb} className={nav === tb ? "on" : ""} onClick={() => setNav(tb)}>
               {t("nav_" + tb)}
             </button>
@@ -723,19 +780,21 @@ export function App() {
           setResult={setResult}
           goals={goals}
           asplits={asplits}
+          notes={notes}
           setMap={setMap}
           pacing={pacing}
           setPacing={setPacing}
         />
       )}
       {nav === "import" && <ImportView busy={busy} msg={msg} onFiles={onFiles} onUrl={onUrl} goAbout={() => setNav("about")} />}
-      {nav === "swimmers" && (
+      {(nav === "swimmers" || nav === "watching") && (
         <SwimmersView
           swimmers={swimmers}
           roster={roster}
           addSwimmer={addSwimmer}
           removeSwimmer={removeSwimmer}
           goImport={() => setNav("import")}
+          mode={nav === "watching" ? "watch" : "mine"}
         />
       )}
       {nav === "teams" && (
@@ -746,7 +805,7 @@ export function App() {
           goImport={() => setNav("import")}
         />
       )}
-      {nav === "about" && <About logo={logo} setLogo={setLogo} />}
+      {nav === "about" && <About logo={logo} setLogo={setLogo} setBrand={setBrand} />}
     </div>
   );
 }
@@ -840,7 +899,7 @@ function bySession(items: DE[]): { label: string; items: DE[] }[] {
 }
 
 function Home(props: any) {
-  const { swimmers, meets, view, pickView, filter, toggleFilter, results, setResult, goals, asplits, setMap, pacing, setPacing } = props;
+  const { swimmers, meets, view, pickView, filter, toggleFilter, results, setResult, goals, asplits, notes, setMap, pacing, setPacing } = props;
   const [showSample, setShowSample] = useState(() => location.search.includes("demo"));
   const [cols, setCols] = useState<{ pb: boolean; cut: boolean; champ: boolean }>(() => {
     try {
@@ -962,8 +1021,10 @@ function Home(props: any) {
                             onSetResult={(v: string) => setResult(d.meetId, d.e.event, d.swimmer, v)}
                             goal={goals[k]}
                             asplits={asplits[k]}
+                            note={notes[k]}
                             onGoal={(v: string) => setMap("goal", d.meetId, d.e.event, d.swimmer, v)}
                             onSplits={(v: string) => setMap("splits", d.meetId, d.e.event, d.swimmer, v)}
+                            onNote={(v: string) => setMap("note", d.meetId, d.e.event, d.swimmer, v)}
                             pacing={pacing}
                             setPacing={setPacing}
                           />
@@ -1080,14 +1141,16 @@ function ImportView(props: { busy: boolean; msg: string; onFiles: (f: FileList |
 function SwimmersView(props: {
   swimmers: Swimmer[];
   roster: RosterItem[];
-  addSwimmer: (name: string, team: string, age?: number, gender?: "Girls" | "Boys") => void;
+  addSwimmer: (name: string, team: string, age?: number, gender?: "Girls" | "Boys", watch?: boolean) => void;
   removeSwimmer: (id: string) => void;
   goImport: () => void;
+  mode: "mine" | "watch";
 }) {
   const [q, setQ] = useState("");
   const [manual, setManual] = useState(false);
   const [mName, setMName] = useState("");
   const [mTeam, setMTeam] = useState("");
+  const watchMode = props.mode === "watch";
 
   const ql = q.trim().toLowerCase();
   const results = ql
@@ -1096,31 +1159,25 @@ function SwimmersView(props: {
         .slice(0, 12)
     : [];
   const isAdded = (name: string) => props.swimmers.some((s) => matchesName(s.name, name));
-
-  const mine = props.swimmers.filter((s) => !s.watch);
-  const watch = props.swimmers.filter((s) => s.watch);
-  const row = (s: Swimmer) => (
-    <div className="kid-row" key={s.id}>
-      <span className="kid-dot" style={{ background: s.color }} />
-      <span className="kid-name">
-        {displayName(s.name)}{" "}
-        <span className="muted">{[s.gender, s.age, s.team].filter(Boolean).join(" · ")}</span>
-      </span>
-      <button className="remove" onClick={() => props.removeSwimmer(s.id)}>
-        ✕
-      </button>
-    </div>
-  );
+  const list = props.swimmers.filter((s) => (watchMode ? s.watch : !s.watch));
 
   return (
     <div>
       <div className="card">
-        <h2>{t("sw_your")}</h2>
-        {props.swimmers.length === 0 && <p className="muted">{t("sw_none")}</p>}
-        {mine.length > 0 && watch.length > 0 && <div className="team-head">{t("myswimmers")}</div>}
-        {mine.map(row)}
-        {watch.length > 0 && <div className="team-head">{t("watchlist")}</div>}
-        {watch.map(row)}
+        <h2>{watchMode ? t("watchlist") : t("myswimmers")}</h2>
+        {list.length === 0 && <p className="muted">{t("sw_none")}</p>}
+        {list.map((s) => (
+          <div className="kid-row" key={s.id}>
+            <span className="kid-dot" style={{ background: s.color }} />
+            <span className="kid-name">
+              {displayName(s.name)}{" "}
+              <span className="muted">{[s.gender, s.age, s.team].filter(Boolean).join(" · ")}</span>
+            </span>
+            <button className="remove" onClick={() => props.removeSwimmer(s.id)}>
+              ✕
+            </button>
+          </div>
+        ))}
       </div>
 
       <div className="card">
@@ -1144,12 +1201,10 @@ function SwimmersView(props: {
                     key={i}
                     className="result"
                     disabled={added}
-                    onClick={() => props.addSwimmer(r.name, r.team, parseInt(r.age, 10) || undefined, r.gender)}
+                    onClick={() => props.addSwimmer(r.name, r.team, parseInt(r.age, 10) || undefined, r.gender, watchMode)}
                   >
                     <span className="result-name">{displayName(r.name)}</span>
-                    <span className="result-meta">
-                      {[r.gender, r.age, r.team].filter(Boolean).join(" · ")}
-                    </span>
+                    <span className="result-meta">{[r.gender, r.age, r.team].filter(Boolean).join(" · ")}</span>
                     <span className="result-add">{added ? "✓" : "+"}</span>
                   </button>
                 );
@@ -1167,7 +1222,7 @@ function SwimmersView(props: {
             <button
               className="primary"
               onClick={() => {
-                props.addSwimmer(mName, mTeam);
+                props.addSwimmer(mName, mTeam, undefined, undefined, watchMode);
                 setMName("");
                 setMTeam("");
                 setManual(false);
@@ -1182,7 +1237,28 @@ function SwimmersView(props: {
   );
 }
 
-function processLogo(file: File, cb: (dataUrl: string) => void) {
+// Pick the logo's most vivid (bright + saturated) non-gray color, for header branding.
+function vividColor(ctx: CanvasRenderingContext2D, w: number, h: number): string | null {
+  const data = ctx.getImageData(0, 0, w, h).data;
+  let best: [number, number, number] | null = null;
+  let bestScore = 0;
+  for (let i = 0; i < data.length; i += 16) {
+    const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+    if (a < 128) continue;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    const l = (mx + mn) / 510;
+    const s = mx === mn ? 0 : (mx - mn) / (255 - Math.abs(mx + mn - 255));
+    if (s < 0.35 || l < 0.2 || l > 0.85) continue; // skip gray / near-black / near-white
+    const score = s * (0.55 + 0.45 * l); // favor brighter
+    if (score > bestScore) {
+      bestScore = score;
+      best = [r, g, b];
+    }
+  }
+  return best ? "#" + best.map((v) => v.toString(16).padStart(2, "0")).join("") : null;
+}
+
+function processLogo(file: File, cb: (dataUrl: string, color: string | null) => void) {
   const img = new Image();
   img.onload = () => {
     const max = 160;
@@ -1192,14 +1268,15 @@ function processLogo(file: File, cb: (dataUrl: string) => void) {
     const c = document.createElement("canvas");
     c.width = w;
     c.height = h;
-    c.getContext("2d")?.drawImage(img, 0, 0, w, h);
-    cb(c.toDataURL("image/png"));
+    const ctx = c.getContext("2d");
+    ctx?.drawImage(img, 0, 0, w, h);
+    cb(c.toDataURL("image/png"), ctx ? vividColor(ctx, w, h) : null);
     URL.revokeObjectURL(img.src);
   };
   img.src = URL.createObjectURL(file);
 }
 
-function About({ logo, setLogo }: { logo: string; setLogo: (v: string) => void }) {
+function About({ logo, setLogo, setBrand }: { logo: string; setLogo: (v: string) => void; setBrand: (v: string) => void }) {
   return (
     <div className="card about">
       <h2>{t("ab_title")}</h2>
@@ -1220,12 +1297,12 @@ function About({ logo, setLogo }: { logo: string; setLogo: (v: string) => void }
             hidden
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) processLogo(f, setLogo);
+              if (f) processLogo(f, (url, color) => { setLogo(url); setBrand(color || ""); });
             }}
           />
         </label>
         {logo && (
-          <button className="link" onClick={() => setLogo("")}>
+          <button className="link" onClick={() => { setLogo(""); setBrand(""); }}>
             {t("logo_remove")}
           </button>
         )}
