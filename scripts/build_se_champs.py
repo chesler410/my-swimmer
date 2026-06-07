@@ -15,7 +15,7 @@ import json
 import re
 import fitz
 
-SRC = "samples/se_lc_champs.pdf"
+SRC = "scripts/sources/se_lc_champs.pdf"
 STROKE = {"Free": "FR", "Back": "BK", "Breast": "BR", "Fly": "FL", "IM": "IM"}
 AGE_RE = re.compile(r"(8&UNDER|10&UNDER|11&12|13&14|15&16|17&18|OPEN|SENIOR)", re.I)
 EVENT_RE = re.compile(r"^(\d+)\s+(Free|Back|Breast|Fly|IM)$")

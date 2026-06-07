@@ -14,7 +14,7 @@ import json
 import re
 import fitz
 
-PDFS = {"LCM": "samples/usas_lcm_standards.pdf", "SCY": "samples/usas_scy_standards.pdf"}
+PDFS = {"LCM": "scripts/sources/usas_lcm_standards.pdf", "SCY": "scripts/sources/usas_scy_standards.pdf"}
 LEVELS = ["B", "BB", "A", "AA", "AAA", "AAAA"]
 STROKE = {"Free": "FR", "Back": "BK", "Breast": "BR", "Fly": "FL", "IM": "IM",
           "FR": "FR", "BK": "BK", "BR": "BR", "FL": "FL"}
