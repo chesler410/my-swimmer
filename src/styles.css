@@ -328,3 +328,29 @@ footer { margin-top: 20px; text-align: center; }
 /* ---- about ---- */
 .about h3 { margin: 16px 0 4px; font-size: 0.95rem; }
 .about p { font-size: 0.9rem; line-height: 1.5; }
+
+/* ---- swimmer search / results ---- */
+.team-head { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 10px 0 2px; }
+.results { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.result {
+  display: flex; align-items: center; gap: 8px;
+  border: 1.5px solid #e1e8f0; background: #fff; border-radius: 10px;
+  padding: 10px 12px; font: inherit; text-align: left; cursor: pointer;
+}
+.result:disabled { opacity: .55; cursor: default; }
+.result-name { font-weight: 600; }
+.result-meta { color: var(--muted); font-size: 0.8rem; margin-left: auto; }
+.result-add { color: var(--blue); font-weight: 800; font-size: 1.1rem; width: 18px; text-align: center; }
+.inline-link { border: none; background: none; color: var(--blue); text-decoration: underline; font: inherit; cursor: pointer; padding: 0; }
+.manual-toggle { display: inline-block; margin-top: 12px; }
+.manual { margin-top: 10px; }
+.small { font-size: 0.78rem; }
+.importmsg { background: #eaf4ff; border: 1px solid #cfe5fb; color: #134; border-radius: 10px; padding: 10px 12px; font-size: 0.85rem; }
+.about code { background: #eef2f6; padding: 1px 5px; border-radius: 5px; font-size: 0.82em; }
+
+/* ---- isolated sample ---- */
+.sample { margin-top: 28px; border-top: 2px dashed #d3dde7; padding-top: 12px; }
+.sample-toggle { width: 100%; text-align: left; border: none; background: none; color: var(--muted); font: inherit; font-size: 0.85rem; font-weight: 600; padding: 6px 4px; cursor: pointer; }
+.sample-body { position: relative; opacity: 0.92; }
+.sample-body h3 { color: var(--muted); font-size: 0.95rem; margin: 6px 4px 10px; text-transform: capitalize; }
+.sample-badge { display: inline-block; background: #9aa7b3; color: #fff; font-size: 0.65rem; font-weight: 800; letter-spacing: 1px; padding: 2px 8px; border-radius: 6px; margin: 0 4px 8px; }

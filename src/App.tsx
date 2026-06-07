@@ -1,18 +1,25 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  Kid,
+  Swimmer,
   Meet,
   Entry,
-  loadKids,
-  saveKids,
+  RosterItem,
+  loadSwimmers,
+  saveSwimmers,
   loadMeets,
   saveMeets,
-  makeKid,
-  importPdf,
+  loadProxy,
+  saveProxy,
+  makeSwimmer,
+  matchesName,
+  buildRoster,
+  importFile,
+  importUrl,
 } from "./store.ts";
+import { computeCut, CutResult } from "./cuts.ts";
 import day from "./day.json";
 
-type Nav = "home" | "kids" | "import" | "about";
+type Nav = "home" | "import" | "swimmers" | "about";
 
 function displayName(n: string): string {
   if (n.includes(",")) {
@@ -21,62 +28,37 @@ function displayName(n: string): string {
   }
   return n;
 }
+const firstName = (n: string) => displayName(n).split(" ")[0];
 
-const STROKE_ABBR: Record<string, string> = {
-  Free: "FR", Back: "BK", Breast: "BR", Fly: "FL", IM: "IM",
+const STROKE_ABBR: Record<string, string> = { Free: "FR", Back: "BK", Breast: "BR", Fly: "FL", IM: "IM" };
+const swimAbbr = (race: string) => {
+  const [d, ...r] = race.split(" ");
+  return `${d} ${STROKE_ABBR[r.join(" ")] ?? r.join(" ")}`;
 };
-function swimAbbr(race: string): string {
-  const [dist, ...rest] = race.split(" ");
-  const stroke = rest.join(" ");
-  return `${dist} ${STROKE_ABBR[stroke] ?? stroke}`;
-}
-function heatNum(h: string | null): string {
-  const m = h?.match(/Heat\s+(\d+)/);
-  return m ? m[1] : "—";
-}
-function firstName(n: string): string {
-  return displayName(n).split(" ")[0];
+const heatNum = (h: string | null) => h?.match(/Heat\s+(\d+)/)?.[1] ?? "—";
+const levelClass = (l?: string | null) => "lvl lvl-" + (l ? l.toLowerCase() : "none");
+
+interface DE {
+  e: Entry;
+  color: string;
+  swimmer: string;
+  cut: CutResult | null;
 }
 
-function sampleMeet(): Meet {
-  const d = day as any;
-  return {
-    id: "sample",
-    title: d.meet + " (sample)",
-    importedAt: Date.now(),
-    parsedCount: d.events.length,
-    entries: d.events.map((e: any) => ({
-      event: e.event,
-      race: e.race,
-      desc: e.desc,
-      heat: e.heat,
-      lane: e.lane,
-      seed: e.seed,
-      kidId: "sample",
-      kidName: "Sample Swimmer",
-      achieved: e.achieved ?? null,
-      nextCut: e.nextCut ?? null,
-    })),
-  };
-}
-
-function levelClass(lvl?: string | null) {
-  return "lvl lvl-" + (lvl ? lvl.toLowerCase() : "none");
-}
-
-function EntryCard({ e, color, showKid }: { e: Entry; color: string; showKid: boolean }) {
-  const close = e.nextCut && e.nextCut.needed <= 1.0;
+function EntryCard({ d, showSwimmer }: { d: DE; showSwimmer: boolean }) {
+  const { e, cut } = d;
+  const close = cut?.nextCut && cut.nextCut.needed <= 1.0;
   return (
     <div className={"card event" + (close ? " close" : "")}>
       <div className="ev-top">
-        {showKid && (
-          <span className="kid-tag" style={{ background: color }}>
-            {firstName(e.kidName)}
+        {showSwimmer && (
+          <span className="kid-tag" style={{ background: d.color }}>
+            {firstName(d.swimmer)}
           </span>
         )}
         <span className="ev-num">#{e.event}</span>
         <span className="ev-race">{e.race}</span>
-        {e.achieved && <span className={levelClass(e.achieved)}>{e.achieved}</span>}
+        {cut?.achieved && <span className={levelClass(cut.achieved)}>{cut.achieved}</span>}
       </div>
       <div className="ev-meta">
         <span>{e.heat ?? "Heat TBD"}</span>
@@ -85,13 +67,13 @@ function EntryCard({ e, color, showKid }: { e: Entry; color: string; showKid: bo
           Best <strong>{e.seed}</strong>
         </span>
       </div>
-      {e.nextCut ? (
+      {cut?.nextCut ? (
         <div className="cut">
           <span>
-            Next cut → <strong>{e.nextCut.level}</strong> {e.nextCut.time}
+            Next cut → <strong>{cut.nextCut.level}</strong> {cut.nextCut.time}
           </span>
           <span className={"need" + (close ? " need-close" : "")}>
-            drop {e.nextCut.needed.toFixed(2)}s{close ? " — so close! 🔥" : ""}
+            drop {cut.nextCut.needed.toFixed(2)}s{close ? " — so close! 🔥" : ""}
           </span>
         </div>
       ) : (
@@ -101,8 +83,11 @@ function EntryCard({ e, color, showKid }: { e: Entry; color: string; showKid: bo
   );
 }
 
-function ArmTable({ entries, kids }: { entries: Entry[]; kids: Kid[] }) {
-  const multi = new Set(entries.map((e) => e.kidId)).size > 1;
+function ArmTable({ items }: { items: DE[] }) {
+  const multi = new Set(items.map((d) => d.swimmer)).size > 1;
+  const sorted = [...items].sort(
+    (a, b) => (a.e.team || "").localeCompare(b.e.team || "") || a.e.event - b.e.event
+  );
   return (
     <div className="card">
       <table className="arm">
@@ -116,26 +101,18 @@ function ArmTable({ entries, kids }: { entries: Entry[]; kids: Kid[] }) {
           </tr>
         </thead>
         <tbody>
-          {entries.map((e, i) => (
+          {sorted.map((d, i) => (
             <tr key={i}>
-              {multi && (
-                <td
-                  style={{ color: kids.find((k) => k.id === e.kidId)?.color ?? "#888", fontWeight: 600 }}
-                >
-                  {firstName(e.kidName)}
-                </td>
-              )}
-              <td className="mono">{e.event}</td>
-              <td>{swimAbbr(e.race)}</td>
-              <td className="mono">{heatNum(e.heat)}</td>
-              <td className="mono">{e.lane}</td>
+              {multi && <td style={{ color: d.color, fontWeight: 600 }}>{firstName(d.swimmer)}</td>}
+              <td className="mono">{d.e.event}</td>
+              <td>{swimAbbr(d.e.race)}</td>
+              <td className="mono">{heatNum(d.e.heat)}</td>
+              <td className="mono">{d.e.lane}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="muted arm-note">
-        Ev = event #, Ht = heat, Ln = lane. FR free · BK back · BR breast · FL fly · IM.
-      </p>
+      <p className="muted arm-note">Ev = event #, Ht = heat, Ln = lane. FR free · BK back · BR breast · FL fly · IM.</p>
     </div>
   );
 }
@@ -156,9 +133,7 @@ function Fueling() {
 }
 
 function Disclaimer() {
-  const [hidden, setHidden] = useState(
-    () => localStorage.getItem("dismiss-disclaimer") === "1"
-  );
+  const [hidden, setHidden] = useState(() => localStorage.getItem("dismiss-disclaimer") === "1");
   if (hidden) return null;
   return (
     <div className="disclaimer">
@@ -178,31 +153,25 @@ function Disclaimer() {
   );
 }
 
-const DEMO = location.search.includes("demo");
-const DEMO_KID: Kid = { id: "sample", name: "Sample Swimmer", color: "#0b3d91" };
-
 export function App() {
-  const [nav, setNav] = useState<Nav>("home");
-  const [kids, setKids] = useState<Kid[]>(() => {
-    const stored = loadKids();
-    return stored.length === 0 && DEMO ? [DEMO_KID] : stored;
+  const [nav, setNav] = useState<Nav>(() => {
+    const t = new URLSearchParams(location.search).get("tab");
+    return (["home", "import", "swimmers", "about"].includes(t || "") ? t : "home") as Nav;
   });
-  const [meets, setMeets] = useState<Meet[]>(() => {
-    const stored = loadMeets();
-    return stored.length === 0 && DEMO ? [sampleMeet()] : stored;
-  });
-  const [view, setView] = useState<"cards" | "table">(() => {
-    const h = location.hash.replace("#", "");
-    if (h === "table" || h === "cards") return h;
-    return (localStorage.getItem("view") as "cards" | "table") || "cards";
-  });
-  const [active, setActive] = useState<Set<string>>(new Set());
+  const [swimmers, setSwimmers] = useState<Swimmer[]>(loadSwimmers);
+  const [meets, setMeets] = useState<Meet[]>(loadMeets);
+  const [view, setView] = useState<"cards" | "table">(
+    () => (localStorage.getItem("view") as "cards" | "table") || "cards"
+  );
+  const [filter, setFilter] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
-  function persistKids(k: Kid[]) {
-    setKids(k);
-    saveKids(k);
+  const roster = useMemo(() => buildRoster(meets), [meets]);
+
+  function persistSwimmers(s: Swimmer[]) {
+    setSwimmers(s);
+    saveSwimmers(s);
   }
   function persistMeets(m: Meet[]) {
     setMeets(m);
@@ -212,31 +181,53 @@ export function App() {
     setView(v);
     localStorage.setItem("view", v);
   }
-  function toggleKid(id: string) {
-    const next = new Set(active);
-    next.has(id) ? next.delete(id) : next.add(id);
-    setActive(next);
+  function addSwimmer(name: string, team: string) {
+    if (!name.trim()) return;
+    if (swimmers.some((s) => matchesName(s.name, name) && (s.team || "") === (team || ""))) return;
+    persistSwimmers([...swimmers, makeSwimmer(name, team, swimmers.length)]);
   }
-  const isShown = (e: Entry) => active.size === 0 || active.has(e.kidId);
+  function removeSwimmer(id: string) {
+    persistSwimmers(swimmers.filter((s) => s.id !== id));
+  }
+  function toggleFilter(id: string) {
+    const n = new Set(filter);
+    n.has(id) ? n.delete(id) : n.add(id);
+    setFilter(n);
+  }
 
   async function onFiles(files: FileList | null) {
-    if (!files || !files.length) return;
+    if (!files?.length) return;
     setBusy(true);
     setMsg("");
     const added: Meet[] = [];
     let err = "";
     for (const f of Array.from(files)) {
       try {
-        added.push(await importPdf(f, kids));
-      } catch {
-        err = `Couldn't read ${f.name}. Is it a Hy-Tek heat sheet PDF?`;
+        added.push(await importFile(f));
+      } catch (e: any) {
+        err = e?.message || `Couldn't read ${f.name}.`;
       }
     }
+    finishImport(added, err);
+  }
+
+  async function onUrl(url: string) {
+    if (!url.trim()) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      finishImport([await importUrl(url, loadProxy())], "");
+    } catch (e: any) {
+      finishImport([], e?.message || "Couldn't fetch that link.");
+    }
+  }
+
+  function finishImport(added: Meet[], err: string) {
     if (added.length) {
       persistMeets([...added, ...meets]);
-      const matched = added.reduce((n, m) => n + m.entries.length, 0);
-      setMsg(`Imported ${added.length} file(s) — ${matched} event(s) matched your swimmers.`);
-      setNav("home");
+      const total = added.reduce((n, m) => n + m.entries.length, 0);
+      setMsg(`Imported ${added.length} file(s) — ${total} swimmers found. Now pick yours below.`);
+      setNav(swimmers.length ? "home" : "swimmers");
     } else if (err) {
       setMsg(err);
     }
@@ -248,7 +239,7 @@ export function App() {
       <header className="apphead">
         <div className="brand">🏊 my-swimmer</div>
         <nav className="tabs">
-          {(["home", "import", "kids", "about"] as Nav[]).map((t) => (
+          {(["home", "import", "swimmers", "about"] as Nav[]).map((t) => (
             <button key={t} className={nav === t ? "on" : ""} onClick={() => setNav(t)}>
               {t === "import" ? "Add meet" : t[0].toUpperCase() + t.slice(1)}
             </button>
@@ -258,166 +249,162 @@ export function App() {
 
       {nav === "home" && (
         <Home
-          kids={kids}
+          swimmers={swimmers}
           meets={meets}
           view={view}
           pickView={pickView}
-          active={active}
-          toggleKid={toggleKid}
-          isShown={isShown}
-          loadSample={() => persistMeets([sampleMeet(), ...meets])}
+          filter={filter}
+          toggleFilter={toggleFilter}
           goImport={() => setNav("import")}
-          goKids={() => setNav("kids")}
+          goSwimmers={() => setNav("swimmers")}
           removeMeet={(id) => persistMeets(meets.filter((m) => m.id !== id))}
         />
       )}
-
-      {nav === "import" && (
-        <ImportView kids={kids} busy={busy} msg={msg} onFiles={onFiles} goKids={() => setNav("kids")} />
+      {nav === "import" && <ImportView busy={busy} msg={msg} onFiles={onFiles} onUrl={onUrl} goAbout={() => setNav("about")} />}
+      {nav === "swimmers" && (
+        <SwimmersView
+          swimmers={swimmers}
+          roster={roster}
+          addSwimmer={addSwimmer}
+          removeSwimmer={removeSwimmer}
+          goImport={() => setNav("import")}
+        />
       )}
-
-      {nav === "kids" && (
-        <KidsView kids={kids} persistKids={persistKids} />
-      )}
-
       {nav === "about" && <About />}
     </div>
   );
 }
 
-function Home(props: {
-  kids: Kid[];
-  meets: Meet[];
-  view: "cards" | "table";
-  pickView: (v: "cards" | "table") => void;
-  active: Set<string>;
-  toggleKid: (id: string) => void;
-  isShown: (e: Entry) => boolean;
-  loadSample: () => void;
-  goImport: () => void;
-  goKids: () => void;
-  removeMeet: (id: string) => void;
-}) {
-  const { kids, meets, view, pickView, active, toggleKid, isShown } = props;
-  const allEntries = meets.flatMap((m) => m.entries).filter(isShown);
-  const closest = [...allEntries]
-    .filter((e) => e.nextCut)
-    .sort((a, b) => a.nextCut!.needed - b.nextCut!.needed)
-    .slice(0, 3);
+function buildDisplay(meets: Meet[], swimmers: Swimmer[], filter: Set<string>) {
+  const active = swimmers.filter((s) => filter.size === 0 || filter.has(s.id));
+  return meets.map((m) => {
+    const items: DE[] = [];
+    for (const s of active)
+      for (const e of m.entries)
+        if (matchesName(s.name, e.name))
+          items.push({ e, color: s.color, swimmer: s.name, cut: computeCut(e.desc, e.seed) });
+    items.sort((a, b) => a.e.event - b.e.event);
+    return { meet: m, items };
+  });
+}
 
-  if (kids.length === 0) {
-    return (
-      <Empty
-        title="Add your swimmer(s)"
-        body="Set up each of your kids once. We'll find their events in any meet you import — all on one page."
-        cta="Add a swimmer"
-        onCta={props.goKids}
-      />
-    );
-  }
-  if (meets.length === 0) {
-    return (
-      <Empty
-        title="Add a meet"
-        body="Import the meet's heat-sheet PDF(s) and we'll pull every one of your kids' events, with the next cut to beat."
-        cta="Add a meet"
-        onCta={props.goImport}
-        secondary="Load a sample meet"
-        onSecondary={props.loadSample}
-      />
-    );
-  }
+function Home(props: any) {
+  const { swimmers, meets, view, pickView, filter, toggleFilter } = props;
+  const [showSample, setShowSample] = useState(() => location.search.includes("demo"));
+  const groups = buildDisplay(meets, swimmers, filter);
+  const all = groups.flatMap((g: any) => g.items as DE[]);
+  const closest = [...all]
+    .filter((d) => d.cut?.nextCut)
+    .sort((a, b) => a.cut!.nextCut!.needed - b.cut!.nextCut!.needed)
+    .slice(0, 3);
 
   return (
     <>
-      <Disclaimer />
-
-      {kids.length > 1 && (
-        <div className="chips">
-          {kids.map((k) => (
-            <button
-              key={k.id}
-              className={"chip" + (active.size === 0 || active.has(k.id) ? " on" : "")}
-              style={
-                active.size === 0 || active.has(k.id)
-                  ? { background: k.color, borderColor: k.color, color: "#fff" }
-                  : {}
-              }
-              onClick={() => toggleKid(k.id)}
-            >
-              {firstName(k.name)}
-            </button>
-          ))}
-        </div>
+      {meets.length === 0 && swimmers.length === 0 && (
+        <Empty title="Welcome 🏊" body="Add a meet's heat sheet, pick your swimmers, and see all their events — events, heats, lanes, and the next time standard to chase — on one page." cta="Add a meet" onCta={props.goImport} />
+      )}
+      {meets.length > 0 && swimmers.length === 0 && (
+        <Empty title="Pick your swimmers" body="Your meet is loaded. Now tell us which swimmers are yours — search the meet's roster." cta="Choose swimmers" onCta={props.goSwimmers} />
       )}
 
-      {closest.length > 0 && (
-        <section className="card highlight">
-          <h2>🎯 Closest to a new cut</h2>
-          {closest.map((e, i) => (
-            <div className="hl-row" key={i}>
-              <span>
-                {kids.length > 1 ? `${firstName(e.kidName)} · ` : ""}
-                {e.race}
-              </span>
-              <span className="hl-need">
-                {e.nextCut!.level} in {e.nextCut!.needed.toFixed(2)}s
-              </span>
+      {meets.length > 0 && swimmers.length > 0 && (
+        <>
+          <Disclaimer />
+          {swimmers.length > 1 && (
+            <div className="chips">
+              {swimmers.map((k: Swimmer) => {
+                const on = filter.size === 0 || filter.has(k.id);
+                return (
+                  <button
+                    key={k.id}
+                    className={"chip" + (on ? " on" : "")}
+                    style={on ? { background: k.color, borderColor: k.color, color: "#fff" } : {}}
+                    onClick={() => toggleFilter(k.id)}
+                  >
+                    {firstName(k.name)}
+                  </button>
+                );
+              })}
             </div>
-          ))}
-        </section>
-      )}
-
-      <Fueling />
-
-      <div className="events-head">
-        <h2 className="section-title">Meets ({meets.length})</h2>
-        <div className="seg">
-          <button className={view === "cards" ? "on" : ""} onClick={() => pickView("cards")}>
-            Cards
-          </button>
-          <button className={view === "table" ? "on" : ""} onClick={() => pickView("table")}>
-            Arm table
-          </button>
-        </div>
-      </div>
-
-      {meets.map((m) => {
-        const shown = m.entries.filter(isShown);
-        return (
-          <div className="meet-block" key={m.id}>
-            <div className="meet-head">
-              <h3>{m.title}</h3>
-              <button className="remove" onClick={() => props.removeMeet(m.id)} aria-label="Remove meet">
-                ✕
+          )}
+          {closest.length > 0 && (
+            <section className="card highlight">
+              <h2>🎯 Closest to a new cut</h2>
+              {closest.map((d, i) => (
+                <div className="hl-row" key={i}>
+                  <span>
+                    {swimmers.length > 1 ? `${firstName(d.swimmer)} · ` : ""}
+                    {d.e.race}
+                  </span>
+                  <span className="hl-need">
+                    {d.cut!.nextCut!.level} in {d.cut!.nextCut!.needed.toFixed(2)}s
+                  </span>
+                </div>
+              ))}
+            </section>
+          )}
+          <Fueling />
+          <div className="events-head">
+            <h2 className="section-title">Meets ({meets.length})</h2>
+            <div className="seg">
+              <button className={view === "cards" ? "on" : ""} onClick={() => pickView("cards")}>
+                Cards
+              </button>
+              <button className={view === "table" ? "on" : ""} onClick={() => pickView("table")}>
+                Arm table
               </button>
             </div>
-            {shown.length === 0 ? (
-              <p className="muted meet-empty">
-                No matched events{m.parsedCount ? ` (read ${m.parsedCount} entries; names didn't match — check spelling on the Kids tab)` : ""}.
-              </p>
-            ) : view === "cards" ? (
-              shown.map((e, i) => (
-                <EntryCard key={i} e={e} color={kids.find((k) => k.id === e.kidId)?.color ?? "#888"} showKid={kids.length > 1} />
-              ))
-            ) : (
-              <ArmTable entries={shown} kids={kids} />
-            )}
           </div>
-        );
-      })}
+          {groups.map(({ meet, items }: any) => (
+            <div className="meet-block" key={meet.id}>
+              <div className="meet-head">
+                <h3>{meet.title}</h3>
+                <button className="remove" onClick={() => props.removeMeet(meet.id)}>
+                  ✕
+                </button>
+              </div>
+              {items.length === 0 ? (
+                <p className="muted meet-empty">None of your swimmers are in this meet.</p>
+              ) : view === "cards" ? (
+                items.map((d: DE, i: number) => <EntryCard key={i} d={d} showSwimmer={swimmers.length > 1} />)
+              ) : (
+                <ArmTable items={items} />
+              )}
+            </div>
+          ))}
+        </>
+      )}
+
+      <SampleBlock open={showSample} setOpen={setShowSample} />
     </>
   );
 }
 
-function Empty(props: {
-  title: string;
-  body: string;
-  cta: string;
-  onCta: () => void;
-  secondary?: string;
-  onSecondary?: () => void;
-}) {
+function SampleBlock({ open, setOpen }: { open: boolean; setOpen: (b: boolean) => void }) {
+  const d = day as any;
+  return (
+    <div className="sample">
+      <button className="sample-toggle" onClick={() => setOpen(!open)}>
+        {open ? "▾" : "▸"} See a sample (demo data — not your swimmer)
+      </button>
+      {open && (
+        <div className="sample-body">
+          <div className="sample-badge">SAMPLE</div>
+          <h3>{d.meet}</h3>
+          {d.events.map((e: any, i: number) => (
+            <EntryCard
+              key={i}
+              d={{ e: { ...e, name: "Sample Swimmer", team: "DEMO-SE" }, color: "#9aa7b3", swimmer: "Sample Swimmer", cut: computeCut(e.desc, e.seed) }}
+              showSwimmer={false}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Empty(props: { title: string; body: string; cta: string; onCta: () => void }) {
   return (
     <div className="card empty">
       <h2>{props.title}</h2>
@@ -425,122 +412,175 @@ function Empty(props: {
       <button className="primary" onClick={props.onCta}>
         {props.cta}
       </button>
-      {props.secondary && (
-        <button className="link" onClick={props.onSecondary}>
-          {props.secondary}
-        </button>
-      )}
     </div>
   );
 }
 
-function ImportView(props: {
-  kids: Kid[];
-  busy: boolean;
-  msg: string;
-  onFiles: (f: FileList | null) => void;
-  goKids: () => void;
-}) {
-  if (props.kids.length === 0) {
-    return (
-      <Empty
-        title="Add a swimmer first"
-        body="We match events to your kids by name, so add at least one swimmer before importing a meet."
-        cta="Add a swimmer"
-        onCta={props.goKids}
-      />
-    );
-  }
+function ImportView(props: { busy: boolean; msg: string; onFiles: (f: FileList | null) => void; onUrl: (u: string) => void; goAbout: () => void }) {
+  const [url, setUrl] = useState("");
   return (
-    <div className="card empty">
-      <h2>Add a meet</h2>
-      <p>
-        Choose the meet's heat-sheet PDF(s). Many meets post one PDF per session — pick them all;
-        each becomes a section. Everything is read on your phone; nothing is uploaded.
-      </p>
-      <label className="primary filelabel">
-        {props.busy ? "Reading…" : "Choose PDF(s)"}
-        <input
-          type="file"
-          accept="application/pdf"
-          multiple
-          disabled={props.busy}
-          onChange={(e) => props.onFiles(e.target.files)}
-          hidden
-        />
-      </label>
-      {props.msg && <p className="muted importmsg">{props.msg}</p>}
+    <div>
+      <div className="card">
+        <h2>Add a meet</h2>
+        <p className="muted">Many meets post one PDF per session — add them all; each becomes a section. Everything is read on your phone; nothing is uploaded.</p>
+        <label className="primary filelabel">
+          {props.busy ? "Reading…" : "📄 Upload PDF(s)"}
+          <input type="file" accept="application/pdf" multiple disabled={props.busy} onChange={(e) => props.onFiles(e.target.files)} hidden />
+        </label>
+      </div>
+
+      <div className="card">
+        <h2>…or paste a link</h2>
+        <p className="muted">Paste a direct link to the meet's heat-sheet PDF (no download needed).</p>
+        <input className="field" placeholder="https://…/heatsheet.pdf" value={url} onChange={(e) => setUrl(e.target.value)} inputMode="url" />
+        <button className="primary" disabled={props.busy || !url.trim()} onClick={() => props.onUrl(url)}>
+          {props.busy ? "Fetching…" : "Fetch & add"}
+        </button>
+        <p className="muted small">
+          Some meet sites block direct fetching. If it fails, set up the free fetch helper (
+          <button className="inline-link" onClick={props.goAbout}>
+            About
+          </button>
+          ) or use Upload.
+        </p>
+      </div>
+
+      {props.msg && <p className="importmsg">{props.msg}</p>}
     </div>
   );
 }
 
-function KidsView(props: { kids: Kid[]; persistKids: (k: Kid[]) => void }) {
-  const [name, setName] = useState("");
-  const [team, setTeam] = useState("");
-  function add() {
-    if (!name.trim()) return;
-    props.persistKids([...props.kids, makeKid(name, team, props.kids.length)]);
-    setName("");
-    setTeam("");
+function SwimmersView(props: {
+  swimmers: Swimmer[];
+  roster: RosterItem[];
+  addSwimmer: (name: string, team: string) => void;
+  removeSwimmer: (id: string) => void;
+  goImport: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const [manual, setManual] = useState(false);
+  const [mName, setMName] = useState("");
+  const [mTeam, setMTeam] = useState("");
+
+  const ql = q.trim().toLowerCase();
+  const results = ql
+    ? props.roster
+        .filter((r) => r.name.toLowerCase().includes(ql) || r.team.toLowerCase().includes(ql))
+        .slice(0, 12)
+    : [];
+  const isAdded = (name: string) => props.swimmers.some((s) => matchesName(s.name, name));
+
+  // group selected swimmers by team
+  const byTeam = new Map<string, Swimmer[]>();
+  for (const s of props.swimmers) {
+    const t = s.team || "—";
+    if (!byTeam.has(t)) byTeam.set(t, []);
+    byTeam.get(t)!.push(s);
   }
+
   return (
     <div>
       <div className="card">
         <h2>Your swimmers</h2>
-        {props.kids.length === 0 && <p className="muted">No swimmers yet — add one below.</p>}
-        {props.kids.map((k) => (
-          <div className="kid-row" key={k.id}>
-            <span className="kid-dot" style={{ background: k.color }} />
-            <span className="kid-name">
-              {displayName(k.name)} {k.team && <span className="muted">· {k.team}</span>}
-            </span>
-            <button
-              className="remove"
-              onClick={() => props.persistKids(props.kids.filter((x) => x.id !== k.id))}
-            >
-              ✕
-            </button>
+        {props.swimmers.length === 0 && <p className="muted">None yet — search a meet's roster below.</p>}
+        {[...byTeam.keys()].sort().map((team) => (
+          <div key={team}>
+            {byTeam.size > 1 && <div className="team-head">{team}</div>}
+            {byTeam.get(team)!.map((s) => (
+              <div className="kid-row" key={s.id}>
+                <span className="kid-dot" style={{ background: s.color }} />
+                <span className="kid-name">
+                  {displayName(s.name)} {s.team && <span className="muted">· {s.team}</span>}
+                </span>
+                <button className="remove" onClick={() => props.removeSwimmer(s.id)}>
+                  ✕
+                </button>
+              </div>
+            ))}
           </div>
         ))}
       </div>
+
       <div className="card">
-        <h2>Add a swimmer</h2>
-        <p className="muted">Use the name as it appears in heat sheets (first + last is fine).</p>
-        <input className="field" placeholder="Swimmer name" value={name} onChange={(e) => setName(e.target.value)} />
-        <input className="field" placeholder="Team (optional)" value={team} onChange={(e) => setTeam(e.target.value)} />
-        <button className="primary" onClick={add}>
-          Add swimmer
+        <h2>Find a swimmer</h2>
+        {props.roster.length === 0 ? (
+          <>
+            <p className="muted">Import a meet first, then search its roster here to pick your swimmers.</p>
+            <button className="primary" onClick={props.goImport}>
+              Add a meet
+            </button>
+          </>
+        ) : (
+          <>
+            <input className="field" placeholder="Type a name or team…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+            {ql && results.length === 0 && <p className="muted">No swimmer matching “{q}” in your imported meets.</p>}
+            <div className="results">
+              {results.map((r, i) => {
+                const added = isAdded(r.name);
+                return (
+                  <button key={i} className="result" disabled={added} onClick={() => props.addSwimmer(r.name, r.team)}>
+                    <span className="result-name">{displayName(r.name)}</span>
+                    <span className="result-meta">
+                      {r.team} · {r.age}
+                    </span>
+                    <span className="result-add">{added ? "✓" : "+"}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+        <button className="inline-link manual-toggle" onClick={() => setManual(!manual)}>
+          {manual ? "– cancel manual add" : "+ add by name manually"}
         </button>
+        {manual && (
+          <div className="manual">
+            <input className="field" placeholder="Swimmer name" value={mName} onChange={(e) => setMName(e.target.value)} />
+            <input className="field" placeholder="Team (optional)" value={mTeam} onChange={(e) => setMTeam(e.target.value)} />
+            <button
+              className="primary"
+              onClick={() => {
+                props.addSwimmer(mName, mTeam);
+                setMName("");
+                setMTeam("");
+                setManual(false);
+              }}
+            >
+              Add swimmer
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 function About() {
+  const [proxy, setProxy] = useState(loadProxy);
   return (
     <div className="card about">
       <h2>About my-swimmer</h2>
-      <p>
-        A free, ad-free meet-day companion for swim families. Import a meet's published heat sheet,
-        see all your kids' events on one page, the next motivational cut to beat, and fueling tips.
-      </p>
+      <p>A free, ad-free meet-day companion for swim families. Import a meet's published heat sheet, see all your swimmers' events on one page, the next motivational cut to beat, and fueling tips.</p>
+
       <h3>Your privacy</h3>
-      <p>
-        Everything runs on your device. Your kids' names and meet data are stored only in this
-        browser and are never uploaded to a server. Clearing your browser data removes them.
-      </p>
+      <p>Everything runs on your device. Your swimmers' names and meet data are stored only in this browser and are never uploaded to a server. Clearing your browser data removes them.</p>
+
       <h3>Please double-check</h3>
-      <p>
-        Events are auto-read from PDF heat sheets, which isn't perfect. Always verify event, heat,
-        and lane against the official posted heat sheet before a race. This app is informational and
-        not responsible for missed events.
-      </p>
-      <h3>Not affiliated</h3>
+      <p>Events are auto-read from PDF heat sheets, which isn't perfect. Always verify event, heat, and lane against the official posted heat sheet before a race.</p>
+
+      <h3>Paste-a-link fetch helper (optional)</h3>
       <p className="muted">
-        Not affiliated with or endorsed by USA Swimming, Meet Mobile, or any meet host. It simply
-        reads heat sheets you provide. Time standards are USA Swimming 2024–2028 motivational
-        standards.
+        Many meet sites block apps from fetching their PDFs directly. To use “paste a link,” deploy a tiny free
+        proxy (see <code>proxy/</code> in the project) and paste its URL here. Use <code>{"{url}"}</code> where the
+        link goes, e.g. <code>https://you.workers.dev/?url={"{url}"}</code>.
       </p>
+      <input className="field" placeholder="Fetch helper URL (optional)" value={proxy} onChange={(e) => setProxy(e.target.value)} />
+      <button className="primary" onClick={() => saveProxy(proxy)}>
+        Save helper
+      </button>
+
+      <h3>Not affiliated</h3>
+      <p className="muted">Not affiliated with or endorsed by USA Swimming, Meet Mobile, or any meet host. It simply reads heat sheets you provide. Time standards are USA Swimming 2024–2028 motivational standards.</p>
       <p className="muted">Made by a swim parent. Feedback welcome.</p>
     </div>
   );

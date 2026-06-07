@@ -126,7 +126,7 @@ export async function parseHeatSheet(data: ArrayBuffer): Promise<ParseResult> {
         const row = words
           .filter((w) => Math.abs(w.y - titleLine.y) <= 3)
           .sort((a, b) => a.x - b.x);
-        title = row.map((w) => w.s).join(" ").trim();
+        title = row.map((w) => w.s).join(" ").trim().replace(/(\d)\s+(\d)/g, "$1$2");
       }
     }
     const lefts = columnLefts(words);
