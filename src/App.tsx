@@ -93,6 +93,67 @@ function EventCard({ e }: { e: SwimEvent }) {
   );
 }
 
+const STROKE_ABBR: Record<string, string> = {
+  Free: "FR", Back: "BK", Breast: "BR", Fly: "FL", IM: "IM",
+};
+
+function swimAbbr(race: string): string {
+  const [dist, ...rest] = race.split(" ");
+  const stroke = rest.join(" ");
+  return `${dist} ${STROKE_ABBR[stroke] ?? stroke}`;
+}
+
+function heatNum(h: string | null): string {
+  const m = h?.match(/Heat\s+(\d+)/);
+  return m ? m[1] : "—";
+}
+
+// Compact, by-day lineup you can copy onto an arm in Sharpie.
+function ArmTable({ events }: { events: SwimEvent[] }) {
+  const days = new Map<number, SwimEvent[]>();
+  for (const e of events) {
+    const d = e.day ?? 0;
+    if (!days.has(d)) days.set(d, []);
+    days.get(d)!.push(e);
+  }
+  const order = [...days.keys()].sort((a, b) => a - b);
+  return (
+    <>
+      {order.map((d) => (
+        <div className="card armday" key={d}>
+          <h3>{d ? `Day ${d}` : "Lineup"}</h3>
+          <table className="arm">
+            <thead>
+              <tr>
+                <th>Ev</th>
+                <th>Swim</th>
+                <th>Ht</th>
+                <th>Ln</th>
+              </tr>
+            </thead>
+            <tbody>
+              {days
+                .get(d)!
+                .sort((a, b) => a.event - b.event)
+                .map((e) => (
+                  <tr key={e.event}>
+                    <td className="mono">{e.event}</td>
+                    <td>{swimAbbr(e.race)}</td>
+                    <td className="mono">{heatNum(e.heat)}</td>
+                    <td className="mono">{e.lane}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+      <p className="muted arm-note">
+        Ev = event #, Ht = heat, Ln = lane. FR free · BK back · BR breast · FL fly · IM.
+      </p>
+    </>
+  );
+}
+
 function SwimmerName() {
   const fallback = displayName(data.swimmer.name);
   const [name, setName] = useState(
@@ -131,6 +192,15 @@ function SwimmerName() {
 
 export function App() {
   const events = [...data.events].sort((a, b) => a.event - b.event);
+  const [view, setView] = useState<"cards" | "table">(() => {
+    const h = location.hash.replace("#", "");
+    if (h === "table" || h === "cards") return h;
+    return (localStorage.getItem("view") as "cards" | "table") || "cards";
+  });
+  function pickView(v: "cards" | "table") {
+    setView(v);
+    localStorage.setItem("view", v);
+  }
   const closest = [...events]
     .filter((e) => e.nextCut)
     .sort((a, b) => (a.nextCut!.needed - b.nextCut!.needed))
@@ -164,10 +234,29 @@ export function App() {
 
       <Fueling />
 
-      <h2 className="section-title">Events ({events.length})</h2>
-      {events.map((e) => (
-        <EventCard key={e.event} e={e} />
-      ))}
+      <div className="events-head">
+        <h2 className="section-title">Events ({events.length})</h2>
+        <div className="seg" role="tablist">
+          <button
+            className={view === "cards" ? "on" : ""}
+            onClick={() => pickView("cards")}
+          >
+            Cards
+          </button>
+          <button
+            className={view === "table" ? "on" : ""}
+            onClick={() => pickView("table")}
+          >
+            Arm table
+          </button>
+        </div>
+      </div>
+
+      {view === "cards" ? (
+        events.map((e) => <EventCard key={e.event} e={e} />)
+      ) : (
+        <ArmTable events={events} />
+      )}
 
       <footer>
         <div className="muted">

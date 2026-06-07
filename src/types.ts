@@ -14,6 +14,7 @@ export interface SwimEvent {
   achieved?: string | null;
   nextCut?: NextCut | null;
   ladder?: Record<string, string>;
+  day?: number | null;
 }
 
 export interface MeetDay {

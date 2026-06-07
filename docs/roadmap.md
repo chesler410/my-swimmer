@@ -29,8 +29,13 @@ A rough phasing. Order matters: prove the risky part (PDF parsing) before polish
 ## Phase 4.5 — Shipped milestone (2026-06-07)
 - [x] Installable PWA live at https://chesler410.github.io/my-swimmer/ (repo public)
 - [x] Renders a real meet (sample data): schedule, cuts, closest-to-cut, fueling, disclaimer
+- [x] Editable swimmer name (saved locally; repo ships generic sample data)
+- [x] "Arm table" view (user request): by-day compact table with abbreviations
+      (Ev/Swim/Ht/Ln) for writing the lineup on a swimmer's arm. Toggle vs Cards.
 - [ ] NEXT: in-browser PDF upload (pdf.js port of the parser) so any meet works
 - [ ] NEXT: swimmer picker + multi-swimmer (siblings)
+- [ ] Day/session mapping from the PDF's session schedule (arm table currently uses
+      a sample day split; real meets need the schedule parsed for accurate days + times)
 
 ## Phase 3 — Fueling
 - [ ] Hydration/snack timing woven around the schedule
