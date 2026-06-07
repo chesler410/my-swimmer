@@ -103,6 +103,7 @@ function EntryCard({
           )}
         </div>
       )}
+      {cut && !cut.champ && <div className="champ muted">🏆 {t("nochamp")}</div>}
       {cut?.nextCut ? (
         <div className="cut">
           <span>
