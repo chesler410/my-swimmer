@@ -516,3 +516,14 @@ table.arm th, table.arm td { padding-right: 14px; }
 /* ---- team logo ---- */
 .team-logo { height: 22px; width: auto; max-width: 60px; object-fit: contain; vertical-align: middle; margin-right: 7px; border-radius: 4px; background: #fff; padding: 1px; }
 .team-logo.lg { height: 64px; max-width: 160px; display: block; margin: 6px 0 10px; padding: 4px; }
+
+/* ---- desktop / wide-screen layout (responsive, no device sniffing) ---- */
+@media (min-width: 820px) {
+  .app { max-width: 960px; padding-left: 20px; padding-right: 20px; }
+  .apphead { margin-left: -20px; margin-right: -20px; padding-left: 20px; padding-right: 20px; }
+  .session-block.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; align-items: start; }
+  .session-block.grid .session-head { grid-column: 1 / -1; }
+  .session-block.grid .event { margin-bottom: 0; }
+  /* keep the info cards readable, not super-wide */
+  .disclaimer, .highlight, .fuel, .prep, .empty, .about { max-width: 680px; }
+}

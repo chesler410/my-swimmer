@@ -922,7 +922,7 @@ function Home(props: any) {
                 <p className="muted meet-empty">{t("em_none_meet")}</p>
               ) : (
                 bySession(items).map((sec) => (
-                  <div className="session-block" key={sec.label}>
+                  <div className={"session-block" + (view === "cards" ? " grid" : "")} key={sec.label}>
                     {sec.label !== "Events" && <div className="session-head">📅 {sec.label}</div>}
                     {view === "cards" ? (
                       sec.items.map((d, i) => {
