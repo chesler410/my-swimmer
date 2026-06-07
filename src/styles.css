@@ -476,3 +476,18 @@ footer { margin-top: 20px; text-align: center; }
 .ts-tag { font-size: 0.68rem; font-weight: 700; padding: 2px 9px; border-radius: 20px; color: #fff; white-space: nowrap; }
 .ts-tag.mine { background: var(--blue); }
 .ts-tag.watch { background: #7d4bd0; }
+
+/* ---- update banner ---- */
+.update-banner { display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--gold); color: #3a2c00; margin: 0 -14px 0; padding: 9px 12px; font-size: 0.85rem; font-weight: 600; }
+.update-banner button { border: none; background: #3a2c00; color: #fff; font-weight: 700; padding: 5px 14px; border-radius: 8px; cursor: pointer; }
+/* ---- course badge + cut breakdown + splits-for ---- */
+.course-badge { font-size: 0.68rem; font-weight: 700; background: var(--bg); color: var(--blue); padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
+.theme-dark .course-badge { background: #26313f; color: #bcd3ff; }
+.per-each { color: var(--muted); font-weight: 500; }
+.splits-for { margin: 2px 0 0; }
+.splits-for button { font-size: 0.82rem; }
+
+/* ---- fueling time input ---- */
+.fuel-time { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; }
+.fuel-time input { font: inherit; padding: 5px 8px; border: 1.5px solid #d3dde7; border-radius: 8px; margin-left: 6px; }
+.theme-dark .fuel-time input { background: #0f1822; border-color: #2a3744; color: var(--ink); }

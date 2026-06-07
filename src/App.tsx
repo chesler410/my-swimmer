@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Swimmer,
   Meet,
@@ -20,7 +20,7 @@ import {
   importFile,
   importUrl,
 } from "./store.ts";
-import { computeCut, CutResult, goalSplits } from "./cuts.ts";
+import { computeCut, CutResult, goalSplits, eventMeta, segInfo } from "./cuts.ts";
 import { DEFAULT_PROXY, FEEDBACK_URL } from "./config.ts";
 import { getTheme, setTheme, Theme } from "./theme.ts";
 import { t, getLang, setLang, LANGS, Lang } from "./i18n.ts";
@@ -81,6 +81,7 @@ function EntryCard({
   const [showSplits, setShowSplits] = useState(false);
   const splits = e.relay ? null : goalSplits(e.desc, goal || "");
   const actualArr = (asplits || "").split(",").map((x) => x.trim()).filter(Boolean);
+  const seg = e.relay ? null : segInfo(e.desc);
   const time = result || e.seed;
   const cut = cutFor(d, result);
   const close = cut?.nextCut && cut.nextCut.needed <= 1.0;
@@ -123,6 +124,12 @@ function EntryCard({
           </span>
           <span className={"need" + (close ? " need-close" : "")}>
             {t("drop", { s: cut.nextCut.needed.toFixed(2) })}{close ? t("soclose") : ""}
+            {seg && seg.n >= 2 && (
+              <span className="per-each">
+                {" "}
+                {t("per_each", { s: (cut.nextCut.needed / seg.n).toFixed(2), len: seg.len, unit: seg.unit })}
+              </span>
+            )}
           </span>
         </div>
       ) : cut ? (
@@ -161,7 +168,22 @@ function EntryCard({
           </button>
           {showSplits && (
             <div className="splits-body">
+              {(cut?.nextCut || (cut?.champ && !cut.champ.met)) && (
+                <div className="splits-for">
+                  {cut?.nextCut && (
+                    <button className="chip sm" onClick={() => onGoal?.(cut.nextCut!.time)}>
+                      {t("splits_for", { lvl: cut.nextCut.level })}
+                    </button>
+                  )}
+                  {cut?.champ && !cut.champ.met && (
+                    <button className="chip sm" onClick={() => onGoal?.(cut.champ!.time)}>
+                      {t("splits_for", { lvl: t("sechamp") })}
+                    </button>
+                  )}
+                </div>
+              )}
               <input
+                key={"g" + (goal || "")}
                 className="field result-input"
                 defaultValue={goal || ""}
                 placeholder={t("goal_ph")}
@@ -215,7 +237,7 @@ function ArmTable({
 }: {
   items: DE[];
   results: Record<string, string>;
-  cols: { pb: boolean; cut: boolean };
+  cols: { pb: boolean; cut: boolean; champ: boolean };
 }) {
   const multi = new Set(items.map((d) => d.swimmer)).size > 1;
   const sorted = [...items].sort(
@@ -225,6 +247,10 @@ function ArmTable({
   const cutOf = (d: DE) => {
     const c = cutFor(d, results[resultKey(d.meetId, d.e.event, d.swimmer)]);
     return c?.nextCut ? `${c.nextCut.level} ${c.nextCut.time}` : "—";
+  };
+  const champOf = (d: DE) => {
+    const c = cutFor(d, results[resultKey(d.meetId, d.e.event, d.swimmer)]);
+    return c?.champ ? c.champ.time : "—";
   };
   return (
     <div className="card">
@@ -236,8 +262,9 @@ function ArmTable({
             <th>Ht</th>
             <th>Ln</th>
             <th>Swim</th>
-            {cols.pb && <th>PB</th>}
-            {cols.cut && <th>Cut</th>}
+            {cols.pb && <th>{t("c_pb")}</th>}
+            {cols.cut && <th>{t("c_cut")}</th>}
+            {cols.champ && <th>🏆</th>}
           </tr>
         </thead>
         <tbody>
@@ -250,6 +277,7 @@ function ArmTable({
               <td>{swimAbbr(d.e.race)}</td>
               {cols.pb && <td className="mono">{pbOf(d)}</td>}
               {cols.cut && <td className="mono">{cutOf(d)}</td>}
+              {cols.champ && <td className="mono">{champOf(d)}</td>}
             </tr>
           ))}
         </tbody>
@@ -259,16 +287,44 @@ function ArmTable({
   );
 }
 
+function parseHM(s: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s);
+  return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : null;
+}
+function fmtClock(mins: number): string {
+  let m = ((mins % 1440) + 1440) % 1440;
+  const h = Math.floor(m / 60);
+  const mm = String(m % 60).padStart(2, "0");
+  const ap = h < 12 ? "AM" : "PM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${mm} ${ap}`;
+}
+
 function Fueling() {
+  const [time, setTime] = useState(() => localStorage.getItem("firstRaceTime") || "");
+  const start = parseHM(time);
+  const by = (off: number) => (start != null ? t("fuel_by", { t: fmtClock(start + off) }) : "");
+  const after = (off: number) => (start != null ? t("fuel_after", { t: fmtClock(start + off) }) : "");
   return (
     <section className="card fuel">
       <h2>💧 {t("fuel_title")}</h2>
+      <label className="fuel-time">
+        {t("fuel_first")}{" "}
+        <input
+          type="time"
+          value={time}
+          onChange={(e) => {
+            setTime(e.target.value);
+            localStorage.setItem("firstRaceTime", e.target.value);
+          }}
+        />
+      </label>
       <ul>
         <li>{t("fuel_1")}</li>
-        <li>{t("fuel_2")}</li>
+        <li><b>{by(-75)}</b>{t("fuel_2")}</li>
+        <li><b>{after(-45)}</b>{t("fuel_4")}</li>
+        <li><b>{by(-25)}</b>{t("fuel_5")}</li>
         <li>{t("fuel_3")}</li>
-        <li>{t("fuel_4")}</li>
-        <li>{t("fuel_5")}</li>
       </ul>
     </section>
   );
@@ -288,6 +344,40 @@ function Disclaimer() {
       >
         {t("gotit")}
       </button>
+    </div>
+  );
+}
+
+// Detects a new deploy (build id changed) and prompts a refresh — for tabs left open.
+function UpdateBanner() {
+  const [stale, setStale] = useState(false);
+  useEffect(() => {
+    let on = true;
+    const check = async () => {
+      try {
+        const r = await fetch(`${import.meta.env.BASE_URL}version.json?t=${Date.now()}`, { cache: "no-store" });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (on && j.id && j.id !== __BUILD_ID__) setStale(true);
+      } catch {
+        /* offline / ignore */
+      }
+    };
+    check();
+    const iv = setInterval(check, 120000);
+    const onVis = () => document.visibilityState === "visible" && check();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      on = false;
+      clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, []);
+  if (!stale) return null;
+  return (
+    <div className="update-banner">
+      <span>🆕 {t("update_avail")}</span>
+      <button onClick={() => location.reload()}>{t("update_refresh")}</button>
     </div>
   );
 }
@@ -425,6 +515,7 @@ export function App() {
 
   return (
     <div className="app">
+      <UpdateBanner />
       <header className="apphead">
         <div className="brandrow">
           <div className="brand">🏊 my-swimmer</div>
@@ -560,6 +651,11 @@ function buildDisplay(meets: Meet[], swimmers: Swimmer[], filter: Set<string>) {
   });
 }
 
+function courseLabel(meet: Meet): string {
+  const c = eventMeta(meet.entries[0]?.desc || "").course;
+  return c === "LCM" ? t("course_lcm") : c === "SCY" ? t("course_scy") : c === "SCM" ? t("course_scm") : "";
+}
+
 function bySession(items: DE[]): { label: string; items: DE[] }[] {
   const order: string[] = [];
   const map = new Map<string, DE[]>();
@@ -577,14 +673,14 @@ function bySession(items: DE[]): { label: string; items: DE[] }[] {
 function Home(props: any) {
   const { swimmers, meets, view, pickView, filter, toggleFilter, results, setResult, goals, asplits, setMap } = props;
   const [showSample, setShowSample] = useState(() => location.search.includes("demo"));
-  const [cols, setCols] = useState<{ pb: boolean; cut: boolean }>(() => {
+  const [cols, setCols] = useState<{ pb: boolean; cut: boolean; champ: boolean }>(() => {
     try {
-      return JSON.parse(localStorage.getItem("armcols") || '{"pb":true,"cut":false}');
+      return { pb: true, cut: false, champ: false, ...JSON.parse(localStorage.getItem("armcols") || "{}") };
     } catch {
-      return { pb: true, cut: false };
+      return { pb: true, cut: false, champ: false };
     }
   });
-  function toggleCol(k: "pb" | "cut") {
+  function toggleCol(k: "pb" | "cut" | "champ") {
     const next = { ...cols, [k]: !cols[k] };
     setCols(next);
     localStorage.setItem("armcols", JSON.stringify(next));
@@ -664,12 +760,16 @@ function Home(props: any) {
               <button className={"chip sm" + (cols.cut ? " on" : "")} onClick={() => toggleCol("cut")}>
                 {t("c_cut")}
               </button>
+              <button className={"chip sm" + (cols.champ ? " on" : "")} onClick={() => toggleCol("champ")}>
+                {t("sechamp")}
+              </button>
             </div>
           )}
           {groups.map(({ meet, items }: any) => (
             <div className="meet-block" key={meet.id}>
               <div className="meet-head">
                 <h3>{meet.title}</h3>
+                {courseLabel(meet) && <span className="course-badge">{courseLabel(meet)}</span>}
                 <button className="remove" onClick={() => props.removeMeet(meet.id)}>
                   ✕
                 </button>

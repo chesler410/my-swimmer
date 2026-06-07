@@ -83,6 +83,17 @@ export interface CutResult {
   champ: { time: string; met: boolean; needed: number } | null; // Southeastern champ cut
 }
 
+// Number/size of pool lengths for an event (for per-length pace math).
+export function segInfo(desc: string): { dist: number; len: number; unit: string; n: number } | null {
+  const m = eventMeta(desc);
+  if (!m.course || !m.key) return null;
+  const dist = parseInt(m.key, 10);
+  const len = m.course === "LCM" ? 50 : 25;
+  const unit = m.course === "LCM" ? "m" : "y";
+  const n = Math.round(dist / len);
+  return { dist, len, unit, n };
+}
+
 // Even-split goal pacing: cumulative target at each pool length for a goal time.
 export function goalSplits(desc: string, goal: string): { dist: number; cum: string }[] | null {
   if (!goal) return null;

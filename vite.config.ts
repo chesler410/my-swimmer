@@ -1,11 +1,24 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+import { writeFileSync } from "fs";
+import { resolve } from "path";
+
+// Unique id per build; baked into the app AND written to version.json so open tabs can
+// detect a new deploy and prompt a refresh.
+const buildId = process.env.BUILD_ID || String(Date.now());
 
 // base must match the GitHub Pages subpath when deployed there.
 export default defineConfig({
   base: process.env.APP_BASE ?? "/",
+  define: { __BUILD_ID__: JSON.stringify(buildId) },
   plugins: [
+    {
+      name: "emit-version",
+      writeBundle(options) {
+        writeFileSync(resolve(options.dir || "dist", "version.json"), JSON.stringify({ id: buildId }));
+      },
+    },
     react(),
     VitePWA({
       registerType: "autoUpdate",

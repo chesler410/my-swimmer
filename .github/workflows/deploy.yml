@@ -32,6 +32,7 @@ jobs:
           VITE_PROXY_URL: ${{ vars.PROXY_URL }}
           # In-app Feedback button target (a Google Form, etc.). Falls back to GitHub issues.
           VITE_FEEDBACK_URL: ${{ vars.FEEDBACK_URL }}
+          BUILD_ID: ${{ github.sha }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

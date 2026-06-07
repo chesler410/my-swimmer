@@ -83,6 +83,16 @@ const en: Dict = {
   ab_aff_b: "Not affiliated with USA Swimming, Meet Mobile, or any meet host. Standards are USA Swimming 2024–2028 motivational plus Southeastern championship cuts.",
   ab_lang_note: "Translations are an AI first pass — corrections welcome via feedback.",
   lang_label: "Language",
+  update_avail: "A new version is available.",
+  update_refresh: "Refresh",
+  course_lcm: "Long Course (50m)",
+  course_scy: "Short Course (25y)",
+  course_scm: "Short Course (25m)",
+  splits_for: "🎯 Splits to make {lvl}",
+  per_each: "≈ {s}/{len}{unit}",
+  fuel_first: "First race time → timed plan",
+  fuel_by: "⏰ by {t} · ",
+  fuel_after: "⏰ after {t} · ",
 };
 
 const es: Dict = {
@@ -151,6 +161,16 @@ const es: Dict = {
   ab_aff_b: "No afiliado con USA Swimming, Meet Mobile ni ningún organizador. Estándares: USA Swimming 2024–2028 más cortes de campeonato Southeastern.",
   ab_lang_note: "Las traducciones son una primera versión con IA — correcciones bienvenidas.",
   lang_label: "Idioma",
+  update_avail: "Hay una nueva versión disponible.",
+  update_refresh: "Actualizar",
+  course_lcm: "Curso largo (50m)",
+  course_scy: "Curso corto (25y)",
+  course_scm: "Curso corto (25m)",
+  splits_for: "🎯 Parciales para {lvl}",
+  per_each: "≈ {s}/{len}{unit}",
+  fuel_first: "Hora de la 1ª prueba → plan",
+  fuel_by: "⏰ antes de {t} · ",
+  fuel_after: "⏰ después de {t} · ",
 };
 
 const zh: Dict = {
@@ -219,6 +239,16 @@ const zh: Dict = {
   ab_aff_b: "与USA Swimming、Meet Mobile及任何主办方无关。标准为USA Swimming 2024–2028激励标准及Southeastern锦标达标。",
   ab_lang_note: "翻译为AI初版——欢迎通过反馈纠正。",
   lang_label: "语言",
+  update_avail: "有新版本可用。",
+  update_refresh: "刷新",
+  course_lcm: "长池 (50米)",
+  course_scy: "短池 (25码)",
+  course_scm: "短池 (25米)",
+  splits_for: "🎯 达到{lvl}的分段",
+  per_each: "≈ {s}/{len}{unit}",
+  fuel_first: "首项比赛时间 → 计划",
+  fuel_by: "⏰ {t}前 · ",
+  fuel_after: "⏰ {t}后 · ",
 };
 
 const pt: Dict = {
@@ -287,6 +317,16 @@ const pt: Dict = {
   ab_aff_b: "Sem afiliação com USA Swimming, Meet Mobile ou organizadores. Índices: USA Swimming 2024–2028 e cortes de campeonato Southeastern.",
   ab_lang_note: "As traduções são uma primeira versão com IA — correções são bem-vindas.",
   lang_label: "Idioma",
+  update_avail: "Há uma nova versão disponível.",
+  update_refresh: "Atualizar",
+  course_lcm: "Piscina longa (50m)",
+  course_scy: "Piscina curta (25j)",
+  course_scm: "Piscina curta (25m)",
+  splits_for: "🎯 Parciais para {lvl}",
+  per_each: "≈ {s}/{len}{unit}",
+  fuel_first: "Hora da 1ª prova → plano",
+  fuel_by: "⏰ até {t} · ",
+  fuel_after: "⏰ após {t} · ",
 };
 
 const de: Dict = {
@@ -355,6 +395,16 @@ const de: Dict = {
   ab_aff_b: "Keine Verbindung zu USA Swimming, Meet Mobile oder Veranstaltern. Normen: USA Swimming 2024–2028 sowie Southeastern-Meisterschaftsnormen.",
   ab_lang_note: "Übersetzungen sind eine KI-Erstfassung — Korrekturen willkommen.",
   lang_label: "Sprache",
+  update_avail: "Eine neue Version ist verfügbar.",
+  update_refresh: "Aktualisieren",
+  course_lcm: "Langbahn (50m)",
+  course_scy: "Kurzbahn (25y)",
+  course_scm: "Kurzbahn (25m)",
+  splits_for: "🎯 Splits für {lvl}",
+  per_each: "≈ {s}/{len}{unit}",
+  fuel_first: "Zeit 1. Rennen → Plan",
+  fuel_by: "⏰ bis {t} · ",
+  fuel_after: "⏰ nach {t} · ",
 };
 
 const vi: Dict = {
@@ -423,6 +473,16 @@ const vi: Dict = {
   ab_aff_b: "Không liên kết với USA Swimming, Meet Mobile hay ban tổ chức. Chuẩn: USA Swimming 2024–2028 và chuẩn vô địch Southeastern.",
   ab_lang_note: "Bản dịch là phiên bản AI đầu tiên — hoan nghênh góp ý chỉnh sửa.",
   lang_label: "Ngôn ngữ",
+  update_avail: "Đã có phiên bản mới.",
+  update_refresh: "Làm mới",
+  course_lcm: "Hồ dài (50m)",
+  course_scy: "Hồ ngắn (25y)",
+  course_scm: "Hồ ngắn (25m)",
+  splits_for: "🎯 Chặng để đạt {lvl}",
+  per_each: "≈ {s}/{len}{unit}",
+  fuel_first: "Giờ lượt đầu → kế hoạch",
+  fuel_by: "⏰ trước {t} · ",
+  fuel_after: "⏰ sau {t} · ",
 };
 
 const DICTS: Record<Lang, Dict> = { en, es, zh, pt, de, vi };
