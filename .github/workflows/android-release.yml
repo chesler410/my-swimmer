@@ -1,0 +1,75 @@
+name: Android build (.aab)
+
+# Builds a signed Android App Bundle for Google Play. Runs entirely on Ubuntu
+# (no Mac, no local Android SDK needed). Produces an .aab artifact you download
+# and upload to the Play Console (Internal testing → later Production).
+#
+# One-time: create an upload keystore and set these repo secrets:
+#   ANDROID_KEYSTORE_BASE64    base64 of your upload-keystore.jks
+#   ANDROID_KEYSTORE_PASSWORD  keystore password
+#   ANDROID_KEY_ALIAS          key alias
+#   ANDROID_KEY_PASSWORD       key password
+# Generate a keystore (any machine with the JDK):
+#   keytool -genkeypair -v -keystore upload-keystore.jks -alias myswimmer \
+#     -keyalg RSA -keysize 2048 -validity 9125
+#   base64 -w0 upload-keystore.jks   (Linux) / certutil on Windows
+# Keep the .jks safe — Play ties your app to it (or enroll in Play App Signing).
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["android-v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: "npm" }
+      - uses: actions/setup-java@v4
+        with: { distribution: "temurin", java-version: "21" }
+      - uses: android-actions/setup-android@v3
+
+      - name: Install deps + build web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Add Android platform + sync + icons
+        run: |
+          npx cap add android
+          npx cap sync android
+          npx capacitor-assets generate --assetPath assets --android || true
+
+      - name: Decode keystore
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/upload-keystore.jks"
+
+      - name: Build signed AAB
+        working-directory: android
+        env:
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          VCODE=$(git rev-list --count HEAD)
+          VNAME=$(node -p "require('../package.json').version")
+          chmod +x ./gradlew
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file="$RUNNER_TEMP/upload-keystore.jks" \
+            -Pandroid.injected.signing.store.password="$KS_PASS" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASS" \
+            -Pandroid.injected.version.code="$VCODE" \
+            -Pandroid.injected.version.name="$VNAME"
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-swimmer-release-aab
+          path: android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error

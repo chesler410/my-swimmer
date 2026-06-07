@@ -493,6 +493,10 @@ footer { margin-top: 20px; text-align: center; }
 .note-actions .cancel { background: var(--bg); color: var(--muted); }
 .theme-dark .note-actions .cancel { background: #26313f; }
 
+/* ---- ko-fi tip jar ---- */
+.kofi-btn { display: inline-block; background: #13c3ff; color: #00121a; border: none; font-weight: 700; }
+.theme-dark .kofi-btn { color: #00121a; }
+
 /* ---- coach team stats ---- */
 .teamstats h2 { margin: 0 0 10px; }
 .stat-row { display: flex; gap: 8px; }

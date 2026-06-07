@@ -1,0 +1,117 @@
+name: iOS TestFlight
+
+# Builds the Capacitor iOS app on a macOS runner and uploads to TestFlight.
+# No Mac needed locally. Reuses the ACCOUNT-LEVEL App Store Connect API key from
+# the sibling health-rpg setup — copy these 4 repo secrets over and it just works:
+#   APPSTORE_CONNECT_KEY_ID       App Store Connect API key ID
+#   APPSTORE_CONNECT_ISSUER_ID    Issuer UUID
+#   APPSTORE_CONNECT_KEY_BASE64   base64 of the .p8 key file
+#   APPLE_TEAM_ID                 Apple Developer team ID (10 chars)
+# One-time per app: create the app record in App Store Connect with bundle id
+#   com.chesler410.myswimmer  (matches capacitor.config.ts)
+# Signing is automatic (-allowProvisioningUpdates) — Apple mints the profile via
+# the API key, so there are no cert/profile secrets to manage. If that ever churns,
+# switch to the manual-keychain approach used in health-rpg's testflight.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: "TestFlight notes"
+        default: "Internal build"
+        required: false
+  push:
+    tags: ["ios-v*"]
+
+jobs:
+  build-and-upload:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: "npm" }
+
+      - name: Select latest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -v Beta | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Install deps + build web
+        run: |
+          npm ci
+          npm run build   # base "/" (no APP_BASE) — correct for Capacitor
+
+      - name: Add iOS platform + sync
+        run: |
+          npx cap add ios
+          npx cap sync ios
+          npx cap-assets generate --assetPath assets --ios || npx capacitor-assets generate --assetPath assets || true
+
+      - name: Write App Store Connect API key
+        env:
+          API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_KEY_ID }}
+          API_KEY_B64: ${{ secrets.APPSTORE_CONNECT_KEY_BASE64 }}
+        run: |
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          echo "$API_KEY_B64" | base64 -d > "$HOME/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8"
+
+      - name: Build number from commit count
+        id: bn
+        run: echo "build=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Archive
+        working-directory: ios/App
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
+        run: |
+          MARKETING=$(node -p "require('../../package.json').version")
+          xcodebuild -workspace App.xcworkspace -scheme App \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8" \
+            -authenticationKeyID "$API_KEY_ID" -authenticationKeyIssuerID "$API_ISSUER_ID" \
+            -allowProvisioningUpdates \
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            MARKETING_VERSION="$MARKETING" CURRENT_PROJECT_VERSION='${{ steps.bn.outputs.build }}' \
+            archive
+
+      - name: Export IPA
+        working-directory: ios/App
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportPath "$RUNNER_TEMP/ipa" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates
+
+      - name: Upload to TestFlight
+        env:
+          API_KEY_ID: ${{ secrets.APPSTORE_CONNECT_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -o pipefail
+          IPA=$(ls "$RUNNER_TEMP"/ipa/*.ipa | head -1)
+          xcrun altool --upload-app -f "$IPA" -t ios \
+            --apiKey "$API_KEY_ID" --apiIssuer "$API_ISSUER_ID" 2>&1 | tee altool.log
+          if grep -q "No errors uploading" altool.log && ! grep -qiE "ERROR:|already been used" altool.log; then
+            echo "TestFlight upload accepted."
+          else
+            echo "::error::TestFlight upload failed — see log above."; exit 1
+          fi

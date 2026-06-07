@@ -62,6 +62,31 @@ rebuild, no backend, no health APIs.
    TestFlight workflow, ship to TestFlight.
 5. Public release once both internal tracks look good.
 
+## Your one-time setup checklist (the parts only you can do)
+
+Code/CI is in place: `capacitor.config.ts` (appId `com.chesler410.myswimmer`),
+`.github/workflows/ios-testflight.yml`, `.github/workflows/android-release.yml`,
+icon source `assets/logo.svg`. Native folders (`ios/`, `android/`) are generated in CI.
+
+**iOS (no Mac):**
+1. App Store Connect → **create the app** (bundle `com.chesler410.myswimmer`, name "My Swimmer").
+2. In the my-swimmer GitHub repo → Settings → Secrets → Actions, **copy these 4 from the
+   health-rpg repo** (account-level, reusable): `APPSTORE_CONNECT_KEY_ID`,
+   `APPSTORE_CONNECT_ISSUER_ID`, `APPSTORE_CONNECT_KEY_BASE64`, `APPLE_TEAM_ID`.
+3. Run the **iOS TestFlight** workflow (Actions tab → Run workflow). It builds + uploads.
+   - If automatic signing churns, fall back to health-rpg's manual-keychain steps.
+
+**Android ($25 one-time):**
+1. Pay the **Google Play Developer** registration ($25, one time).
+2. Create an **upload keystore** (command in `android-release.yml`); set 4 secrets:
+   `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+   `ANDROID_KEY_PASSWORD`.
+3. Run the **Android build** workflow → download the `.aab` artifact → Play Console →
+   Internal testing → upload. (Emulator testing via Android Studio AVD, no device needed.)
+
+**Both stores:** host `docs/privacy.md` (link it in each listing), add screenshots +
+descriptions. App icon auto-generates from `assets/logo.svg`.
+
 ## Notes / guardrails
 - COPPA: local-first means **no data collection**, so we're a normal Sports app, not
   the strict Kids Category — but keep the privacy policy explicit about it.

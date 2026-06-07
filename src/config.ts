@@ -10,3 +10,6 @@ export const DEFAULT_PROXY: string = import.meta.env.VITE_PROXY_URL ?? "";
 // Google Form (or Tally/Typeform) link. Falls back to the GitHub issues page.
 export const FEEDBACK_URL: string =
   import.meta.env.VITE_FEEDBACK_URL || "https://github.com/chesler410/my-swimmer/issues";
+
+// Optional tip jar (free app, no ads). Shown in About.
+export const KOFI_URL: string = import.meta.env.VITE_KOFI_URL || "https://ko-fi.com/chesler410";

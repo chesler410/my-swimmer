@@ -26,3 +26,8 @@ preview*.png
 # python
 __pycache__/
 *.pyc
+
+# Capacitor — native shells are generated in CI (cap add) from config + dist
+/ios
+/android
+.env.capacitor
