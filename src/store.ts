@@ -2,7 +2,8 @@
 // Meets keep their FULL parsed roster so you can search swimmers and add them any time
 // (re-matching is automatic). COPPA-friendly: nothing leaves the device.
 import { parsePdf, Finisher } from "./parser";
-import { eventMeta } from "./cuts";
+import { parseSdif, looksLikeSdif } from "./sdif";
+import { eventMeta, fmt } from "./cuts";
 
 export interface Entry {
   event: number;
@@ -133,6 +134,15 @@ export type ImportOutcome =
   | { kind: "results"; title: string; finishers: Finisher[] };
 
 export async function importBuffer(buf: ArrayBuffer, fallback: string, source: "upload" | "url"): Promise<ImportOutcome> {
+  // SD3 / SDIF is plain text (not a PDF). Detect and parse it into a meet.
+  if (!isPdf(buf)) {
+    const text = new TextDecoder("utf-8").decode(buf);
+    if (looksLikeSdif(text)) {
+      const s = parseSdif(text);
+      if (!s.entries.length) throw new Error("No events found in this SD3 file.");
+      return { kind: "meet", meet: toMeet(s.title, s.entries, fallback, source) };
+    }
+  }
   const r = await parsePdf(buf);
   if (r.kind === "results") {
     if (!r.finishers.length) throw new Error("No results found in this PDF.");
@@ -143,7 +153,7 @@ export async function importBuffer(buf: ArrayBuffer, fallback: string, source: "
 }
 
 export async function importFile(file: File): Promise<ImportOutcome> {
-  return importBuffer(await file.arrayBuffer(), file.name.replace(/\.pdf$/i, ""), "upload");
+  return importBuffer(await file.arrayBuffer(), file.name.replace(/\.(pdf|sd3|zip|hy3|cl2)$/i, ""), "upload");
 }
 
 // Apply a results sheet to existing meets: fill the actual (Finals) time for each matched
@@ -172,6 +182,83 @@ export function applyResults(
       }
   }
   return { results: next, matched };
+}
+
+// ---- Per-swimmer progress: best time per event across every imported meet ----
+const _toSec = (t: string): number => {
+  const s = (t || "").replace("*", "").trim();
+  if (!s || s === "NT") return NaN;
+  if (s.includes(":")) {
+    const [m, sec] = s.split(":");
+    return parseInt(m, 10) * 60 + parseFloat(sec);
+  }
+  return parseFloat(s);
+};
+const courseOf = (desc: string): string =>
+  /LC Meter/i.test(desc) ? "LCM" : /SC Yard/i.test(desc) ? "SCY" : /SC Meter/i.test(desc) ? "SCM" : "";
+
+export interface ProgressEvent {
+  key: string; // "100 FR"
+  race: string; // "100 Free"
+  course: string; // LCM / SCY / SCM / ""
+  desc: string; // a representative event description (for cut computation)
+  best: string; // best (fastest) time, formatted
+  bestSec: number;
+  count: number; // number of recorded swims for this event
+  drop: number | null; // seconds dropped from slowest→fastest (improvement), if >1 swim
+}
+export interface SwimmerProgress {
+  swimmer: Swimmer;
+  events: ProgressEvent[];
+}
+
+// For each swimmer, gather their fastest time per event (course-aware) across all meets,
+// using the actual (results/manual) time when present, otherwise the seed/entry time.
+export function buildProgress(
+  swimmers: Swimmer[],
+  meets: Meet[],
+  results: Record<string, string>
+): SwimmerProgress[] {
+  return swimmers
+    .map((sw) => {
+      const groups = new Map<string, { race: string; course: string; key: string; desc: string; times: number[] }>();
+      for (const m of meets)
+        for (const e of m.entries) {
+          if (e.relay || !matchesName(sw.name, e.name)) continue;
+          const meta = eventMeta(e.desc);
+          if (!meta.key) continue;
+          const override = results[resultKey(m.id, e.event, sw.name)];
+          const sec = _toSec(override || (e.seed !== "NT" ? e.seed : ""));
+          if (!isFinite(sec)) continue;
+          const course = courseOf(e.desc);
+          const gk = `${course}|${meta.key}`;
+          if (!groups.has(gk)) groups.set(gk, { race: meta.race, course, key: meta.key, desc: e.desc, times: [] });
+          groups.get(gk)!.times.push(sec);
+        }
+      const events: ProgressEvent[] = [...groups.values()]
+        .map((g) => {
+          const best = Math.min(...g.times);
+          const worst = Math.max(...g.times);
+          return {
+            key: g.key,
+            race: g.race,
+            course: g.course,
+            desc: g.desc,
+            best: fmt(best),
+            bestSec: best,
+            count: g.times.length,
+            drop: g.times.length > 1 ? +(worst - best).toFixed(2) : null,
+          };
+        })
+        .sort(
+          (a, b) =>
+            a.course.localeCompare(b.course) ||
+            (parseInt(a.key, 10) || 0) - (parseInt(b.key, 10) || 0) ||
+            a.key.localeCompare(b.key)
+        );
+      return { swimmer: sw, events };
+    })
+    .filter((sp) => sp.events.length > 0);
 }
 
 const isPdf = (buf: ArrayBuffer) => {

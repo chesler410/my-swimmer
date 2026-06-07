@@ -20,6 +20,8 @@ import {
   importFile,
   importUrl,
   applyResults,
+  buildProgress,
+  SwimmerProgress,
   ImportOutcome,
 } from "./store.ts";
 import { computeCut, CutResult, goalSplits, eventMeta, segInfo } from "./cuts.ts";
@@ -28,7 +30,7 @@ import { getTheme, setTheme, Theme } from "./theme.ts";
 import { t, getLang, setLang, LANGS, Lang } from "./i18n.ts";
 import day from "./day.json";
 
-type Nav = "home" | "import" | "swimmers" | "watching" | "teams" | "about";
+type Nav = "home" | "import" | "swimmers" | "watching" | "progress" | "teams" | "about";
 
 function displayName(n: string): string {
   if (n.includes(",")) {
@@ -561,7 +563,7 @@ function loadMap(key: string): Record<string, string> {
 export function App() {
   const [nav, setNav] = useState<Nav>(() => {
     const t = new URLSearchParams(location.search).get("tab");
-    return (["home", "import", "swimmers", "watching", "teams", "about"].includes(t || "") ? t : "home") as Nav;
+    return (["home", "import", "swimmers", "watching", "progress", "teams", "about"].includes(t || "") ? t : "home") as Nav;
   });
   const [swimmers, setSwimmers] = useState<Swimmer[]>(loadSwimmers);
   const [meets, setMeets] = useState<Meet[]>(loadMeets);
@@ -757,7 +759,7 @@ export function App() {
           </div>
         </div>
         <nav className="tabs">
-          {(["home", "import", "swimmers", "watching", "teams", "about"] as Nav[]).map((tb) => (
+          {(["home", "import", "swimmers", "watching", "progress", "teams", "about"] as Nav[]).map((tb) => (
             <button key={tb} className={nav === tb ? "on" : ""} onClick={() => setNav(tb)}>
               {t("nav_" + tb)}
             </button>
@@ -795,6 +797,13 @@ export function App() {
           removeSwimmer={removeSwimmer}
           goImport={() => setNav("import")}
           mode={nav === "watching" ? "watch" : "mine"}
+        />
+      )}
+      {nav === "progress" && (
+        <ProgressView
+          progress={buildProgress(swimmers, meets, results)}
+          goImport={() => setNav("import")}
+          goSwimmers={() => setNav("swimmers")}
         />
       )}
       {nav === "teams" && (
@@ -1099,6 +1108,58 @@ function Empty(props: { title: string; body: string; cta: string; onCta: () => v
   );
 }
 
+function ProgressView(props: { progress: SwimmerProgress[]; goImport: () => void; goSwimmers: () => void }) {
+  if (!props.progress.length)
+    return <Empty title={t("prog_empty_t")} body={t("prog_empty_b")} cta={t("prog_empty_cta")} onCta={props.goSwimmers} />;
+  return (
+    <div>
+      <p className="teams-intro muted">{t("prog_intro")}</p>
+      {props.progress.map((sp) => (
+        <div className="card" key={sp.swimmer.id}>
+          <div className="prog-head">
+            <span className="kid-tag" style={{ background: sp.swimmer.color }}>
+              {firstName(sp.swimmer.name)}
+            </span>
+            {sp.swimmer.watch && <span className="ts-tag watch">{t("nav_watching")}</span>}
+          </div>
+          <table className="progtable">
+            <thead>
+              <tr>
+                <th>{t("prog_event")}</th>
+                <th>{t("prog_best")}</th>
+                <th>{t("prog_swims")}</th>
+                <th>{t("prog_level")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sp.events.map((ev) => {
+                const cut = computeCut(ev.desc, ev.best, { age: sp.swimmer.age, gender: sp.swimmer.gender });
+                return (
+                  <tr key={ev.course + ev.key}>
+                    <td className="prog-ev">
+                      {swimAbbr(ev.race)}{" "}
+                      {ev.course && <span className="course-badge">{ev.course}</span>}
+                    </td>
+                    <td className="mono prog-best">
+                      {ev.best}
+                      {ev.drop ? <span className="drop">▼{ev.drop.toFixed(2)}</span> : null}
+                    </td>
+                    <td className="mono">{ev.count}</td>
+                    <td className="prog-lvl">
+                      {cut?.achieved && <span className={levelClass(cut.achieved)}>{cut.achieved}</span>}
+                      {cut?.champ?.met && <span className="champ-met sm">🏆</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ImportView(props: { busy: boolean; msg: string; onFiles: (f: FileList | null) => void; onUrl: (u: string) => void; goAbout: () => void }) {
   const [url, setUrl] = useState("");
   return (
@@ -1119,8 +1180,9 @@ function ImportView(props: { busy: boolean; msg: string; onFiles: (f: FileList |
         <p className="muted">{t("imp_backuptip")}</p>
         <label className="secondary filelabel">
           {props.busy ? t("imp_reading") : t("imp_upload")}
-          <input type="file" accept="application/pdf" multiple disabled={props.busy} onChange={(e) => props.onFiles(e.target.files)} hidden />
+          <input type="file" accept="application/pdf,.sd3,.txt" multiple disabled={props.busy} onChange={(e) => props.onFiles(e.target.files)} hidden />
         </label>
+        <p className="muted small">{t("imp_sd3")}</p>
       </div>
 
       {props.msg && <p className="importmsg">{props.msg}</p>}

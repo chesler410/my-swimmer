@@ -9,19 +9,21 @@ without losing the things that make it good today: free, fast, private, ad-free.
 ## Where it is today (shipped)
 
 A local-first PWA (React/TS, in-browser pdf.js parsing, data on-device):
-- Multi-swimmer **family hub**; **Teams** browser + **Watch list**
+- Multi-swimmer **family hub**; separate **My swimmers** / **Watching** tabs; **Teams** browser
 - Per-event **motivational cut** (+ per-length breakdown) and **Southeastern championship cut**
 - **Goal & splits** (even/realistic) + on-deck split & finish-time logging; **relays**
 - **Arm-table** view (PB/Cut/Champ columns); by-date sections; cards/table
+- **Per-event private notes**; **per-swimmer Progress** (best time per event across all meets + improvement)
+- **Imports**: Hy-Tek heat/psych **PDFs**, **results PDFs** (overlay actual times), and **SD3 (SDIF)** files
 - **Timed fueling** + between-races electrolyte guidance + **.ics reminders**; warm-up/stretch/meals
-- **8 languages**, light/dark theme, **team logo**, responsive desktop, refresh banner
+- **8 languages**, light/dark theme, **team logo** (auto-derives a brand color), responsive desktop, refresh banner
 - Bundled standards (USA Swimming 2024–2028 motivational, all ages/genders/courses; SE champ)
 
 ## Near-term (no backend needed)
 
-- **Results-PDF import** — meets post *results* sheets in the same Hy-Tek format; reuse the parser
-  to pull **actual swum times** automatically → real PBs, cuts achieved, season progress.
-  *(Highest-value next; closest thing to "real-time" that's actually obtainable.)*
+- **HY3 / CL2 import** — the richer Hy-Tek formats (HY3 has full results + splits; CL2 entries).
+  SD3 (SDIF) already lands; HY3 adds per-length splits and is the next file target.
+  *(Needs a real .sd3 to certify SDIF column offsets, and a sample .hy3 to start HY3.)*
 - **Re-enable offline** — bring back a proper service worker (precaching) now that the
   blank-page/cache issues are stable, keeping the refresh banner.
 - **Finish translations** — full coverage for FR/RU and the longer About/prep/fuel text; invite
