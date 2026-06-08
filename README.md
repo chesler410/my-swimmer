@@ -111,5 +111,8 @@ an in-app **"new version — refresh"** banner covers updates meanwhile.
 Hy-Tek imports (HY3/CL2 with per-length splits), accounts + cloud sync, cloud-shared team pages,
 and a native app. See [`docs/roadmap.md`](docs/roadmap.md).
 
+**Shipping to the app stores:** step-by-step owner checklist in
+[`docs/ship-checklist.md`](docs/ship-checklist.md) (Capacitor + reused Apple CI; no Mac needed).
+
 E2E/parser tests live in `scripts/` (`test_sdif.mjs`, `e2e_*.mjs`) and run against a built
 `dist/` with Edge/Chromium via puppeteer-core.
