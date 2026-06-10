@@ -11,9 +11,6 @@ const seChamps = seChampsData as Record<string, Record<string, Record<string, Re
 
 export const LEVELS = ["B", "BB", "A", "AA", "AAA", "AAAA"];
 
-const STROKE_TITLE: Record<string, string> = {
-  Free: "Free", Back: "Back", Breast: "Breast", Fly: "Fly", IM: "IM",
-};
 const STROKE_ABBR: Record<string, string> = {
   Freestyle: "FR", Backstroke: "BK", Breaststroke: "BR", Butterfly: "FL",
 };
@@ -81,7 +78,6 @@ export function fmt(sec: number): string {
 export interface CutResult {
   achieved: string | null;
   nextCut: { level: string; time: string; needed: number } | null;
-  ladder: Ladder | null;
   champ: { time: string; met: boolean; needed: number } | null; // Southeastern champ cut
 }
 
@@ -171,15 +167,12 @@ export function computeCut(
       }
     }
   }
-  const fmtLadder: Ladder = {};
-  for (const lvl of LEVELS) if (ladder[lvl]) fmtLadder[lvl] = fmt(toSec(ladder[lvl]));
   return {
     achieved,
     nextCut:
       nextLevel && nextTime !== null
         ? { level: nextLevel, time: fmt(nextTime), needed: +(seedSec - nextTime).toFixed(2) }
         : null,
-    ladder: fmtLadder,
     champ,
   };
 }

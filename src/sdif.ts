@@ -127,7 +127,7 @@ export function parseSdif(text: string): ParsedSdif {
       const finals = cleanTime(cut(line, D0.finalsTime));
       const prelim = cleanTime(cut(line, D0.prelimTime));
       const seed = cleanTime(cut(line, D0.seedTime));
-      let best = finals || prelim || seed || "NT";
+      const best = finals || prelim || seed || "NT";
       const courseCode =
         finals ? cut(line, D0.finalsCourse) : prelim ? cut(line, D0.prelimCourse) : cut(line, D0.seedCourse);
       const courseWord = COURSE_WORD[courseCode] || COURSE_WORD[courseCode.toUpperCase()] || "SC Yard";

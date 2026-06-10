@@ -96,6 +96,29 @@ try {
   await page.reload({ waitUntil: "networkidle0" });
   await new Promise((r) => setTimeout(r, 300));
   ok(!(await page.$(".meet-share")), "No Share button for an uploaded (no-URL) meet");
+  ok(!!(await page.$(".meet-pack")), "Meet-pack export button shown even for an uploaded meet");
+
+  // --- Team-aware link (tm): shows the team and offers "Coach this team", even on a
+  // fresh device that hasn't picked a role yet — the tap IS the setup. ---
+  await page.evaluate(() => localStorage.clear());
+  const teamPayload = encodeURIComponent(JSON.stringify({ t: "Team Champs", u: resultsUrl, tm: "Dolphins Swim Club" }));
+  await page.goto(`${base}?add=${teamPayload}`, { waitUntil: "networkidle0" });
+  body = await page.evaluate(() => document.body.innerText);
+  ok(/Dolphins Swim Club/.test(body), "Team name shown on a tm share link (pre role pick)");
+  ok(/shared with you/i.test(body), "Share card visible on a fresh device when tm present");
+  clicked = false;
+  for (const b of await page.$$(".share-import .chip")) {
+    if (/Coach this team/i.test(await page.evaluate((el) => el.innerText, b))) { await b.click(); clicked = true; break; }
+  }
+  ok(clicked, "Tapped Coach this team");
+  let setup = null;
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 200));
+    setup = await page.evaluate(() => ({ role: localStorage.getItem("role"), team: localStorage.getItem("coachTeam") }));
+    if (setup.role) break;
+  }
+  ok(setup?.role === "coach" && setup?.team === "Dolphins Swim Club", `Coach role + team set from the link (${JSON.stringify(setup)})`);
+  ok((await page.evaluate(() => location.search)) === "", "?add= param cleared after coach setup");
 } finally {
   console.log("\n" + log.join("\n"));
   await browser.close();

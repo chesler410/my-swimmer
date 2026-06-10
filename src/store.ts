@@ -67,7 +67,6 @@ export const saveSwimmers = (s: Swimmer[]) => localStorage.setItem(SWIMMERS, JSO
 export const loadMeets = () => load<Meet>(MEETS);
 export const saveMeets = (m: Meet[]) => localStorage.setItem(MEETS, JSON.stringify(m));
 export const loadProxy = () => localStorage.getItem(PROXY) || "";
-export const saveProxy = (u: string) => localStorage.setItem(PROXY, u.trim());
 
 export function makeSwimmer(name: string, team: string, index: number, age?: number, gender?: "Girls" | "Boys", watch?: boolean): Swimmer {
   return { id: uid(), name: name.trim(), team: team.trim() || undefined, age, gender, color: COLORS[index % COLORS.length], watch };
@@ -148,13 +147,44 @@ function toMeet(title: string, entries: any[], fallback: string, source: "upload
 }
 
 export type ImportOutcome =
-  | { kind: "meet"; meet: Meet }
+  | { kind: "meet"; meet: Meet; results?: Record<string, string> } // results: meet-pack overlay, keys WITHOUT the meet-id prefix
   | { kind: "results"; title: string; finishers: Finisher[] };
 
+// Meet pack (.myswimmer.json): the already-parsed meet + its result overlay as a small file,
+// so meets imported from uploaded PDFs can be shared too (no re-fetch/re-parse for the
+// recipient). Result keys are stored WITHOUT the meet-id prefix — ids are random per device,
+// so the importer re-prefixes them with the new meet's id.
+export function buildMeetPack(meet: Meet, results: Record<string, string>) {
+  const slice: Record<string, string> = {};
+  const prefix = meet.id + "|";
+  for (const [k, v] of Object.entries(results)) if (k.startsWith(prefix)) slice[k.slice(prefix.length)] = v;
+  return {
+    app: "my-swimmer" as const,
+    kind: "meet-pack" as const,
+    v: 1 as const,
+    meet: { title: meet.title, start: meet.start, sourceUrl: meet.sourceUrl, entries: meet.entries },
+    results: slice,
+  };
+}
+
+export function parseMeetPack(text: string, fallback = "Meet"): { meet: Meet; results: Record<string, string> } | null {
+  try {
+    const p = JSON.parse(text);
+    if (p?.app !== "my-swimmer" || p?.kind !== "meet-pack" || p?.v !== 1 || !Array.isArray(p?.meet?.entries)) return null;
+    const src = p.meet.sourceUrl ? "url" : "upload"; // keep the link so the recipient can re-share it
+    const meet = toMeet(p.meet.title, p.meet.entries, fallback, src, p.meet.sourceUrl || undefined, p.meet.start || undefined);
+    return { meet, results: p.results && typeof p.results === "object" ? p.results : {} };
+  } catch {
+    return null;
+  }
+}
+
 export async function importBuffer(buf: ArrayBuffer, fallback: string, source: "upload" | "url", sourceUrl?: string): Promise<ImportOutcome> {
-  // SD3 / SDIF is plain text (not a PDF). Detect and parse it into a meet.
+  // SD3 / SDIF and meet packs are plain text (not a PDF). Detect and parse into a meet.
   if (!isPdf(buf)) {
     const text = new TextDecoder("utf-8").decode(buf);
+    const pack = parseMeetPack(text, fallback);
+    if (pack) return { kind: "meet", ...pack };
     if (looksLikeSdif(text)) {
       const s = parseSdif(text);
       if (!s.entries.length) throw new Error("No events found in this SD3 file.");
@@ -171,7 +201,7 @@ export async function importBuffer(buf: ArrayBuffer, fallback: string, source: "
 }
 
 export async function importFile(file: File): Promise<ImportOutcome> {
-  return importBuffer(await file.arrayBuffer(), file.name.replace(/\.(pdf|sd3|zip|hy3|cl2)$/i, ""), "upload");
+  return importBuffer(await file.arrayBuffer(), file.name.replace(/(\.myswimmer)?\.(pdf|sd3|zip|hy3|cl2|json)$/i, ""), "upload");
 }
 
 // Apply a results sheet to existing meets: fill the actual (Finals) time for each matched

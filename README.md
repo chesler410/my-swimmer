@@ -36,7 +36,13 @@ when do they eat."
   tap "Near me" (geolocation), then open/import a listed meet. The list is bundled and refreshed
   from the repo, so meets can be added by PR without an app release
 - **Share a meet** — a Share button makes a link that imports the meet on a teammate's device in
-  one tap (carries the public PDF/results URLs, not your data). Post it in the team chat or site
+  one tap (carries the public PDF/results URLs, not your data). Post it in the team chat or site.
+  Sharing in **coach mode** adds your team to the link — the recipient gets a "Coach this team"
+  button that sets up an assistant coach's or team parent's device in one tap
+- **Meet packs** — the 📤 button saves any meet (even one imported from an uploaded PDF) as a
+  small `.myswimmer.json` file with its entries and logged times; teammates import it under
+  Add meet, no re-parsing. Note: the pack carries the same roster info as the heat sheet —
+  it's meant for your own team's chat
 - **8 languages** (EN/ES/ZH/PT/DE/VI/FR/RU — full parity), **light/dark theme**, **team logo**
   (auto-derives a brand color), responsive desktop layout, installable
 
@@ -44,7 +50,8 @@ when do they eat."
 
 1. **Pick your role** the first time — Parent or Coach (changeable anytime in About).
 2. **Add meet** → pick a meet from "Find a meet near you," or upload the heat-sheet PDF(s) /
-   `.sd3` file, or paste a direct PDF link. (To follow live, paste the results link under Live results.)
+   `.sd3` file / a teammate's `.myswimmer.json` meet pack, or paste a direct PDF link.
+   (To follow live, paste the results link under Live results.)
 3. **Swimmers** (parents) → search the meet roster and tap your kids; or, as a **coach**, pick
    your team. Watch teammates/rivals in the **Watching** tab.
 4. **Home** → everyone's events, by date, with cuts and fueling. Toggle **Cards / Arm table**.

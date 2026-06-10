@@ -9,7 +9,6 @@ import {
   loadMeets,
   saveMeets,
   loadProxy,
-  saveProxy,
   loadResults,
   saveResults,
   resultKey,
@@ -20,6 +19,7 @@ import {
   teamSwimmers,
   importFile,
   importUrl,
+  buildMeetPack,
   applyResults,
   buildProgress,
   SwimmerProgress,
@@ -76,10 +76,36 @@ const swimAbbr = (race: string) => {
 const raceOf = (e: Entry) => eventMeta(e.desc).race + (e.relay ? " Relay" : "");
 const heatNum = (h: string | null) => h?.match(/Heat\s+(\d+)/)?.[1] ?? "—";
 const levelClass = (l?: string | null) => "lvl lvl-" + (l ? l.toLowerCase() : "none");
+const ageNum = (a: string) => parseInt(a, 10) || undefined;
+const blurOnEnter = (ev: { key: string; target: EventTarget }) => {
+  if (ev.key === "Enter") (ev.target as HTMLInputElement).blur();
+};
+
+// localStorage-backed useState; an empty value clears the key.
+function useStored<T extends string = string>(key: string, fallback: NoInfer<T>): [T, (v: T) => void] {
+  const [v, setV] = useState<T>(() => (localStorage.getItem(key) as T | null) || fallback);
+  const set = (next: T) => {
+    setV(next);
+    if (next) localStorage.setItem(key, next);
+    else localStorage.removeItem(key);
+  };
+  return [v, set];
+}
+
+// Transient confirmation message (share/pack toasts); clears itself after 2.5s.
+function useToast(): [string, (m: string) => void] {
+  const [msg, setMsg] = useState("");
+  const show = (m: string) => {
+    setMsg(m);
+    setTimeout(() => setMsg(""), 2500);
+  };
+  return [msg, show];
+}
 
 // Shareable meet link: encode the meet's public import URL(s) so a teammate who opens the
-// link imports the same meet on their own device (no backend). u = import URL, r = results.
-interface SharePayload { t?: string; u: string; r?: string }
+// link imports the same meet on their own device (no backend). u = import URL, r = results,
+// tm = team name (set when a coach shares — lets the recipient set up coach mode in one tap).
+interface SharePayload { t?: string; u: string; r?: string; tm?: string }
 function buildShareUrl(p: SharePayload): string {
   return `${location.origin}${location.pathname}?add=${encodeURIComponent(JSON.stringify(p))}`;
 }
@@ -216,9 +242,7 @@ function EntryCard({
               onSetResult(ev.target.value.trim());
               setEditing(false);
             }}
-            onKeyDown={(ev) => {
-              if (ev.key === "Enter") (ev.target as HTMLInputElement).blur();
-            }}
+            onKeyDown={blurOnEnter}
           />
         ) : (
           <button className="inline-link" onClick={() => setEditing(true)}>
@@ -255,9 +279,7 @@ function EntryCard({
                 placeholder={t("goal_ph")}
                 inputMode="text"
                 onBlur={(ev) => onGoal?.(ev.target.value.trim())}
-                onKeyDown={(ev) => {
-                  if (ev.key === "Enter") (ev.target as HTMLInputElement).blur();
-                }}
+                onKeyDown={blurOnEnter}
               />
               {splits && setPacing && (
                 <div className="seg pace-seg">
@@ -295,9 +317,7 @@ function EntryCard({
                 defaultValue={asplits || ""}
                 placeholder={t("actual_ph")}
                 onBlur={(ev) => onSplits?.(ev.target.value.trim())}
-                onKeyDown={(ev) => {
-                  if (ev.key === "Enter") (ev.target as HTMLInputElement).blur();
-                }}
+                onKeyDown={blurOnEnter}
               />
             </div>
           )}
@@ -443,20 +463,31 @@ function buildIcs(dateStr: string, start: number): string {
   });
   return s + "END:VCALENDAR\r\n";
 }
-function downloadIcs(text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: "text/calendar" }));
+function downloadFile(name: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "my-swimmer-fuel.ics";
+  a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function downloadIcs(text: string) {
+  downloadFile("my-swimmer-fuel.ics", new Blob([text], { type: "text/calendar" }));
+}
+
+// Save the parsed meet (+ its result overlay) as a .myswimmer.json pack to post in the
+// team chat — works for uploaded PDFs too, which the URL share link can't carry.
+function downloadPack(meet: Meet, results: Record<string, string>) {
+  const slug = meet.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "meet";
+  downloadFile(`${slug}.myswimmer.json`, new Blob([JSON.stringify(buildMeetPack(meet, results))], { type: "application/json" }));
 }
 
 function Fueling() {
   const today = new Date().toISOString().slice(0, 10);
   const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(() => localStorage.getItem("meetDate") || today);
-  const [time, setTime] = useState(() => localStorage.getItem("firstRaceTime") || "");
+  const [date, setDate] = useStored("meetDate", today);
+  const [time, setTime] = useStored("firstRaceTime", "");
   const start = parseHM(time);
   const by = (off: number) => (start != null ? t("fuel_by", { t: fmtClock(start + off) }) : "");
   const after = (off: number) => (start != null ? t("fuel_after", { t: fmtClock(start + off) }) : "");
@@ -470,25 +501,11 @@ function Fueling() {
       <div className="fuel-inputs">
         <label className="fuel-time">
           {t("fuel_date")}{" "}
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => {
-              setDate(e.target.value);
-              localStorage.setItem("meetDate", e.target.value);
-            }}
-          />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
         <label className="fuel-time">
           {t("fuel_first")}{" "}
-          <input
-            type="time"
-            value={time}
-            onChange={(e) => {
-              setTime(e.target.value);
-              localStorage.setItem("firstRaceTime", e.target.value);
-            }}
-          />
+          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
         </label>
       </div>
       <ul>
@@ -629,20 +646,13 @@ export function App() {
   const [swimmers, setSwimmers] = useState<Swimmer[]>(loadSwimmers);
   const [meets, setMeets] = useState<Meet[]>(loadMeets);
   const [role, setRoleState] = useState<Role | null>(() => (localStorage.getItem("role") as Role) || null);
-  const [coachTeam, setCoachTeamState] = useState<string>(() => localStorage.getItem("coachTeam") || "");
+  const [coachTeam, setCoachTeam] = useStored("coachTeam", "");
   function setRole(r: Role | null) {
     setRoleState(r);
     if (r) localStorage.setItem("role", r);
     else localStorage.removeItem("role");
   }
-  function setCoachTeam(team: string) {
-    setCoachTeamState(team);
-    if (team) localStorage.setItem("coachTeam", team);
-    else localStorage.removeItem("coachTeam");
-  }
-  const [view, setView] = useState<"cards" | "table">(
-    () => (localStorage.getItem("view") as "cards" | "table") || "cards"
-  );
+  const [view, setView] = useStored<"cards" | "table">("view", "cards");
   const [filter, setFilter] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -652,25 +662,9 @@ export function App() {
   const [asplits, setAsplitsState] = useState<Record<string, string>>(() => loadMap("actualsplits"));
   const [theme, setThemeState] = useState<Theme>(getTheme);
   const [lang, setLangState] = useState<Lang>(getLang);
-  const [pacing, setPacingState] = useState<"even" | "realistic">(
-    () => (localStorage.getItem("pacing") as "even" | "realistic") || "even"
-  );
-  function setPacing(p: "even" | "realistic") {
-    setPacingState(p);
-    localStorage.setItem("pacing", p);
-  }
-  const [logo, setLogoState] = useState(() => localStorage.getItem("teamLogo") || "");
-  function setLogo(v: string) {
-    setLogoState(v);
-    if (v) localStorage.setItem("teamLogo", v);
-    else localStorage.removeItem("teamLogo");
-  }
-  const [brand, setBrandState] = useState(() => localStorage.getItem("brandColor") || "");
-  function setBrand(v: string) {
-    setBrandState(v);
-    if (v) localStorage.setItem("brandColor", v);
-    else localStorage.removeItem("brandColor");
-  }
+  const [pacing, setPacing] = useStored<"even" | "realistic">("pacing", "even");
+  const [logo, setLogo] = useStored("teamLogo", "");
+  const [brand, setBrand] = useStored("brandColor", "");
   useEffect(() => {
     const el = document.documentElement;
     if (brand) {
@@ -698,13 +692,9 @@ export function App() {
     [coaching, coachTeam, meets, swimmers]
   );
   // Live results: poll a public results URL on a timer and overlay new times as they post.
-  const [liveUrl, setLiveUrlState] = useState(() => localStorage.getItem("liveUrl") || "");
+  const [liveUrl, setLiveUrl] = useStored("liveUrl", "");
   const [liveOn, setLiveOnState] = useState(() => localStorage.getItem("liveOn") === "1");
   const [liveStatus, setLiveStatus] = useState("");
-  function setLiveUrl(v: string) {
-    setLiveUrlState(v);
-    localStorage.setItem("liveUrl", v);
-  }
   function setLiveOn(v: boolean) {
     setLiveOnState(v);
     localStorage.setItem("liveOn", v ? "1" : "0");
@@ -764,10 +754,6 @@ export function App() {
     setMeets(m);
     saveMeets(m);
   }
-  function pickView(v: "cards" | "table") {
-    setView(v);
-    localStorage.setItem("view", v);
-  }
   function addSwimmer(name: string, team: string, age?: number, gender?: "Girls" | "Boys", watch?: boolean) {
     if (!name.trim()) return;
     if (swimmers.some((s) => matchesName(s.name, name) && (s.team || "") === (team || ""))) return;
@@ -822,25 +808,44 @@ export function App() {
       const total = newMeets.reduce((n, m) => n + m.entries.length, 0);
       parts.push(`Imported ${newMeets.length} meet file(s) — ${total} swimmers found.`);
     }
+    // Meet packs bundle a result overlay keyed without the meet id (ids differ per device) —
+    // re-prefix each key with the NEW meet's id before merging.
+    let r = results;
+    let dirty = false;
+    for (const o of outcomes)
+      if (o.kind === "meet" && o.results)
+        for (const [k, v] of Object.entries(o.results)) {
+          if (!dirty) { r = { ...results }; dirty = true; }
+          r[`${o.meet.id}|${k}`] = v;
+        }
+    // Read role/team fresh: "Coach this team" on a share link sets them right before the
+    // async import lands, so the closure's `coaching` can be stale here.
+    const teamNow = localStorage.getItem("role") === "coach" ? localStorage.getItem("coachTeam") || "" : "";
+    const coachingNow = !!teamNow;
     if (resultSets.length) {
-      let r = results;
+      // Coaches match results against the whole team roster (incl. meets imported in this
+      // same batch), like the live poller does — not just the persisted swimmer list.
+      const matchable = coachingNow ? teamSwimmers(meetsNext, teamNow) : swimmers;
       let matched = 0;
       for (const rs of resultSets) {
-        const applied = applyResults(rs.finishers, swimmers, meetsNext, r);
+        const applied = applyResults(rs.finishers, matchable, meetsNext, r);
         r = applied.results;
         matched += applied.matched;
       }
-      setResultsState(r);
-      saveResults(r);
+      dirty = true;
       parts.push(
         matched > 0
           ? `Results: filled ${matched} actual time(s) for your swimmers. 🏁`
           : `Results read, but no times matched your swimmers — import that meet's heat sheet and pick your swimmers first.`
       );
     }
+    if (dirty) {
+      setResultsState(r);
+      saveResults(r);
+    }
     if (!outcomes.length && err) parts.push(err);
-    if ((newMeets.length || resultSets.length) && (swimmers.length || coaching)) setNav("home");
-    else if (newMeets.length && !swimmers.length && !coaching) setNav("swimmers");
+    if ((newMeets.length || resultSets.length) && (swimmers.length || coachingNow)) setNav("home");
+    else if (newMeets.length && !swimmers.length && !coachingNow) setNav("swimmers");
     setMsg(parts.join(" ").trim());
     setBusy(false);
   }
@@ -932,12 +937,27 @@ export function App() {
         />
       )}
 
-      {gated && pendingShare && (
+      {/* Team links also show during first-run setup — "Coach this team" IS the setup. */}
+      {pendingShare && (gated || pendingShare.tm) && (
         <div className="card share-import">
           <h3>📥 {t("share_got")}</h3>
           <p className="disc-title">{pendingShare.t || t("share_meet")}</p>
+          {pendingShare.tm && <p className="muted">{t("share_team", { team: pendingShare.tm })}</p>}
           <div className="disc-actions">
             <button className="primary" onClick={() => { onUrl(pendingShare.u); clearShare(); }}>{t("share_import")}</button>
+            {pendingShare.tm && (
+              <button
+                className="chip"
+                onClick={() => {
+                  setRole("coach");
+                  setCoachTeam(pendingShare.tm!);
+                  onUrl(pendingShare.u);
+                  clearShare();
+                }}
+              >
+                🧑‍🏫 {t("share_coach")}
+              </button>
+            )}
             {pendingShare.r && (
               <button className="chip golive" onClick={() => { setLiveUrl(pendingShare.r!); setLiveOn(true); clearShare(); setNav("home"); }}>🔴 {t("disc_golive")}</button>
             )}
@@ -950,12 +970,12 @@ export function App() {
           swimmers={activeSwimmers}
           meets={meets}
           view={view}
-          pickView={pickView}
+          pickView={setView}
           filter={filter}
           toggleFilter={toggleFilter}
           goImport={() => setNav("import")}
           goSwimmers={() => setNav("swimmers")}
-          removeMeet={(id) => persistMeets(meets.filter((m) => m.id !== id))}
+          removeMeet={(id: string) => persistMeets(meets.filter((m) => m.id !== id))}
           results={results}
           setResult={setResult}
           goals={goals}
@@ -967,6 +987,7 @@ export function App() {
           liveOn={liveOn}
           liveStatus={liveStatus}
           coach={coaching}
+          coachTeam={coaching ? coachTeam : ""}
         />
       )}
       {gated && nav === "import" && (
@@ -1052,10 +1073,10 @@ function TeamsView(props: {
                       <span className={"ts-tag " + st}>{st === "watch" ? t("watchlist") : t("myswimmers")}</span>
                     ) : (
                       <span className="ts-actions">
-                        <button className="chip sm" onClick={() => props.addSwimmer(r.name, r.team, parseInt(r.age, 10) || undefined, r.gender, false)}>
+                        <button className="chip sm" onClick={() => props.addSwimmer(r.name, r.team, ageNum(r.age), r.gender, false)}>
                           + {t("add_mine")}
                         </button>
-                        <button className="chip sm" onClick={() => props.addSwimmer(r.name, r.team, parseInt(r.age, 10) || undefined, r.gender, true)}>
+                        <button className="chip sm" onClick={() => props.addSwimmer(r.name, r.team, ageNum(r.age), r.gender, true)}>
                           + {t("add_watch")}
                         </button>
                       </span>
@@ -1104,9 +1125,9 @@ function bySession(items: DE[]): { label: string; items: DE[] }[] {
 }
 
 function Home(props: any) {
-  const { swimmers, meets, view, pickView, filter, toggleFilter, results, setResult, goals, asplits, notes, setMap, pacing, setPacing, liveOn, liveStatus, coach } = props;
+  const { swimmers, meets, view, pickView, filter, toggleFilter, results, setResult, goals, asplits, notes, setMap, pacing, setPacing, liveOn, liveStatus, coach, coachTeam } = props;
   const [showSample, setShowSample] = useState(() => location.search.includes("demo"));
-  const [shareMsg, setShareMsg] = useState("");
+  const [shareMsg, showToast] = useToast();
   const [cols, setCols] = useState<{ pb: boolean; cut: boolean; champ: boolean }>(() => {
     try {
       return { pb: true, cut: false, champ: false, ...JSON.parse(localStorage.getItem("armcols") || "{}") };
@@ -1259,14 +1280,23 @@ function Home(props: any) {
                     className="meet-share"
                     title={t("share_btn")}
                     onClick={async () => {
-                      const r = await shareMeet({ t: meet.title, u: meet.sourceUrl });
-                      setShareMsg(r === "copied" ? t("share_copied") : r === "shared" ? "" : t("share_fail"));
-                      setTimeout(() => setShareMsg(""), 2500);
+                      const r = await shareMeet({ t: meet.title, u: meet.sourceUrl, tm: coachTeam || undefined });
+                      showToast(r === "copied" ? t("share_copied") : r === "shared" ? "" : t("share_fail"));
                     }}
                   >
                     🔗
                   </button>
                 )}
+                <button
+                  className="meet-pack"
+                  title={t("pack_export")}
+                  onClick={() => {
+                    downloadPack(meet, results);
+                    showToast(t("pack_saved"));
+                  }}
+                >
+                  📤
+                </button>
                 <button className="remove" onClick={() => props.removeMeet(meet.id)}>
                   ✕
                 </button>
@@ -1468,7 +1498,7 @@ function DiscoverView(props: {
   const [stateFilter, setStateFilter] = useState("");
   const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
   const [geoMsg, setGeoMsg] = useState("");
-  const [shareMsg, setShareMsg] = useState("");
+  const [shareMsg, showToast] = useToast();
   const states = [...new Set(props.meets.map((m) => m.state).filter(Boolean))].sort() as string[];
 
   function findNearMe() {
@@ -1527,7 +1557,7 @@ function DiscoverView(props: {
                   {m.resultsUrl && <button className="chip sm" onClick={() => props.onImport(m.resultsUrl!)}>{t("disc_results")}</button>}
                   {m.resultsUrl && <button className="chip sm golive" onClick={() => props.onGoLive(m.resultsUrl!)}>🔴 {t("disc_golive")}</button>}
                   {(m.heatUrl || m.resultsUrl) && (
-                    <button className="chip sm" onClick={async () => { const r = await shareMeet({ t: m.title, u: m.heatUrl || m.resultsUrl!, r: m.resultsUrl }); setShareMsg(r === "copied" ? t("share_copied") : ""); setTimeout(() => setShareMsg(""), 2500); }}>🔗 {t("share_btn")}</button>
+                    <button className="chip sm" onClick={async () => { const r = await shareMeet({ t: m.title, u: m.heatUrl || m.resultsUrl!, r: m.resultsUrl }); showToast(r === "copied" ? t("share_copied") : ""); }}>🔗 {t("share_btn")}</button>
                   )}
                   {m.infoUrl && <a className="chip sm" href={m.infoUrl} target="_blank" rel="noopener noreferrer">{t("disc_open")}</a>}
                 </div>
@@ -1667,9 +1697,10 @@ function ImportView(props: {
         <p className="muted">{t("imp_backuptip")}</p>
         <label className="secondary filelabel">
           {props.busy ? t("imp_reading") : t("imp_upload")}
-          <input type="file" accept="application/pdf,.sd3,.txt" multiple disabled={props.busy} onChange={(e) => props.onFiles(e.target.files)} hidden />
+          <input type="file" accept="application/pdf,.sd3,.txt,.json,.myswimmer.json" multiple disabled={props.busy} onChange={(e) => props.onFiles(e.target.files)} hidden />
         </label>
         <p className="muted small">{t("imp_sd3")}</p>
+        <p className="muted small">{t("imp_pack")}</p>
       </div>
 
       {props.msg && <p className="importmsg">{props.msg}</p>}
@@ -1750,7 +1781,7 @@ function SwimmersView(props: {
                     key={i}
                     className="result"
                     disabled={added}
-                    onClick={() => props.addSwimmer(r.name, r.team, parseInt(r.age, 10) || undefined, r.gender, watchMode)}
+                    onClick={() => props.addSwimmer(r.name, r.team, ageNum(r.age), r.gender, watchMode)}
                   >
                     <span className="result-name">{displayName(r.name)}</span>
                     <span className="result-meta">{[r.gender, r.age, r.team].filter(Boolean).join(" · ")}</span>
